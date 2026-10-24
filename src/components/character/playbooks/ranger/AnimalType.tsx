@@ -138,6 +138,8 @@ export const ANIMAL_TYPES: AnimalTypeConfig[] = [
 export interface TypePicksSectionProps {
   typeId: string;
   typeConfig: AnimalTypeConfig;
+  // Extra picks granted by Magnificent Specimen (2 per take).
+  bonusPicks: number;
   isSelected: boolean;
   picks: Record<string, boolean>;
   customText: string;
@@ -151,6 +153,7 @@ export interface TypePicksSectionProps {
 export const TypePicksSection = ({
   typeId,
   typeConfig,
+  bonusPicks,
   isSelected,
   picks,
   customText,
@@ -161,7 +164,8 @@ export const TypePicksSection = ({
   onCustomCheckedChange,
 }: TypePicksSectionProps) => {
   const selectedCount = typeConfig.picks.filter((p) => !p.defaultChecked && picks[`${typeConfig.id}:${p.id}`]).length;
-  const atMax = selectedCount + (customChecked ? 1 : 0) >= typeConfig.pickCount;
+  const pickCount = typeConfig.pickCount + bonusPicks;
+  const atMax = selectedCount + (customChecked ? 1 : 0) >= pickCount;
 
   const items = useMemo(() => typeConfig.picks.map((p) => {
     const key = `${typeConfig.id}:${p.id}`;
@@ -197,7 +201,7 @@ export const TypePicksSection = ({
       <Text as="span" size="xs" color="muted" leading="normal">
         {`**HP** ${typeConfig.hp} **Armor** ${typeConfig.armor} (size) **Damage** ${typeConfig.damage} *(hand)*`}
       </Text>
-      <Text as="span" size="xs" color="muted" leading="normal">Pick {typeConfig.pickCount} more:</Text>
+      <Text as="span" size="xs" color="muted" leading="normal">Pick {pickCount} more:</Text>
       <CheckboxGroup
         items={items}
         checked={checkedMap}

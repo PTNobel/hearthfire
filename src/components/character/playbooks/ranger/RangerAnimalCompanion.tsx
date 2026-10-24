@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useLatest } from '@/hooks/useLatest';
 import { usePlaybookField } from '@/hooks/usePlaybookField';
 import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
+import { moveTakeCount } from '@/lib/moveTakeCount';
 import { useCrewSave } from '../shared/useCrewSave';
 import { useTrackedField } from '../shared/useTrackedField';
 import { ANIMAL_TYPES, TypePicksSection } from './AnimalType';
@@ -29,6 +30,8 @@ const ANIMAL_COST_OPTIONS: RadioOption[] = [
   { value: 'Time off on its own, free to roam', label: 'Time off on its own, free to roam', description: '' },
   { value: 'Cozy quarters, comfort, ample food', label: 'Cozy quarters, comfort, ample food', description: '' },
 ];
+
+const SPECIMEN_ID = 'ranger-magnificent-specimen';
 
 type RangerAnimalCompanionProps = PlaybookSectionProps;
 
@@ -113,6 +116,9 @@ export const RangerAnimalCompanion = ({ data, onSave }: RangerAnimalCompanionPro
 
   const selectedTypeConfig = ANIMAL_TYPES.find((t) => t.id === animalType);
 
+  // Each take of Magnificent Specimen grants 2 extra options.
+  const bonusPicks = moveTakeCount(data, SPECIMEN_ID) * 2;
+
   const animalTypeOptions: RadioOption[] = ANIMAL_TYPES.map((typeConfig) => ({
     value: typeConfig.id,
     label: typeConfig.label,
@@ -122,6 +128,7 @@ export const RangerAnimalCompanion = ({ data, onSave }: RangerAnimalCompanionPro
       <TypePicksSection
         typeId={typeConfig.id}
         typeConfig={typeConfig}
+        bonusPicks={bonusPicks}
         isSelected={animalType === typeConfig.id}
         picks={typePicks}
         customText={typeCustom[typeConfig.id] ?? ''}
