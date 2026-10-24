@@ -22,3 +22,7 @@
   margin: 0 0 var(--spacing-4);
   line-height: 1.5;
 }
+
+.customForm {
+  margin-top: var(--spacing-4);
+}

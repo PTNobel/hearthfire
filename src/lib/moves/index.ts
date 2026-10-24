@@ -62,4 +62,3 @@ export { SPECIAL_MOVES } from './special';
 export { FOLLOWER_MOVES } from './follower';
 export { EXPEDITION_MOVES } from './expedition';
 export { HOMEFRONT_MOVES } from './homefront';
-export { CUSTOM_MOVES } from './custom';

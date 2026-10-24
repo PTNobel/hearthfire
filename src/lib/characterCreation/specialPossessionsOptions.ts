@@ -1,4 +1,5 @@
 import type { CharacterData, PlaybookType } from '@/types';
+import { bigMagicCount } from '@/lib/bigMagic';
 
 export type PossessionSubItem = { id?: string; label: string; uses?: number; usesLabel?: string; selectable?: boolean } | string;
 
@@ -14,7 +15,7 @@ export type Possession = {
   maxSubItems?: number;
   stockKey?: Extract<keyof CharacterData, 'sacredPouchStock' | 'herbGardenStock'>;
   stockLabel?: string;
-  stockCapacity?: (level: number) => number;
+  stockCapacity?: (level: number, data?: CharacterData) => number;
   label: string;
   subItems?: PossessionSubItem[];
 };
@@ -120,7 +121,8 @@ export const SPECIAL_POSSESSIONS_OPTIONS: Partial<Record<PlaybookType, PlaybookS
         name: 'Sacred pouch',
         isAlwaysSelected: true,
         stockKey: 'sacredPouchStock',
-        stockCapacity: (level) => 3 + Math.floor(level / 2),
+        // Big Magic adds 2 max Stock each time it is taken.
+        stockCapacity: (level, data) => 3 + Math.floor(level / 2) + 2 * bigMagicCount(data),
         label: '**Sacred pouch** (*magical*): see Sacred Pouch section.',
       },
       APIARY,

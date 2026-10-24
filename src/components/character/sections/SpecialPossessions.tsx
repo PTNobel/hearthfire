@@ -254,8 +254,9 @@ export const SpecialPossessions = ({ config, data, onSave, level = 1, chooseOver
     const map: Record<string, React.ReactNode> = {};
     for (const stockItem of config?.items ?? []) {
       if (!stockItem.stockKey) continue;
-      const stock = data?.[stockItem.stockKey] ?? 0;
-      const capacity = stockItem.stockCapacity?.(level) ?? 0;
+      const capacity = stockItem.stockCapacity?.(level, data) ?? 0;
+      // Clamp so un-taking Big Magic doesn't leave more Stock showing than the pouch can hold.
+      const stock = Math.min(data?.[stockItem.stockKey] ?? 0, capacity);
       const visibleLabel = stockItem.stockLabel ?? 'Stock:';
       map[stockItem.id] = (
         <span className={styles.stockRow}>

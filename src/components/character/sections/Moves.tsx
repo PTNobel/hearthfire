@@ -5,8 +5,9 @@ import { usePlaybookMoves } from '@/hooks/usePlaybookMoves';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
 import { Collapse, Text, Toggle } from '@/components/ui';
 import { Move } from '../Move';
+import { CustomMoves } from './CustomMoves';
 import type { MoveDefinition } from '@/types';
-import { BASIC_MOVES, SPECIAL_MOVES, FOLLOWER_MOVES, EXPEDITION_MOVES, HOMEFRONT_MOVES, CUSTOM_MOVES, BACKGROUND_FORCED_MOVES, BACKGROUND_FORCED_CHECKLIST } from '@/lib/moves';
+import { BASIC_MOVES, SPECIAL_MOVES, FOLLOWER_MOVES, EXPEDITION_MOVES, HOMEFRONT_MOVES, BACKGROUND_FORCED_MOVES, BACKGROUND_FORCED_CHECKLIST } from '@/lib/moves';
 import { getLockReason } from '@/lib/moveLockReason';
 import { getPlaybook } from '@/lib/constants';
 import type { PlaybookType, PlaybookSectionProps } from '@/types';
@@ -26,7 +27,6 @@ const STATIC_SECTIONS: MoveSectionProps[] = [
   { label: 'Follower Moves', helperText: 'These moves apply when you interact with your **followers** (page 64).', moves: FOLLOWER_MOVES, emptyText: 'No follower moves yet.' },
   { label: 'Expedition Moves', helperText: 'These moves apply when you prepare for, undertake, or return from an expedition.', moves: EXPEDITION_MOVES, emptyText: 'No expedition moves yet.' },
   { label: 'Homefront Moves', helperText: "These moves apply during downtime, or when you're interacting with a steading's population and resources.", moves: HOMEFRONT_MOVES, emptyText: 'No homefront moves yet.' },
-  { label: 'Custom Moves', helperText: 'These moves apply only to specific game or setting elements, and only if you choose to use them. Consult your GM.', moves: CUSTOM_MOVES, emptyText: 'No custom moves yet.' },
 ];
 
 const MoveSection = ({ label, helperText, moves, emptyText }: MoveSectionProps) => (
@@ -225,6 +225,7 @@ export const Moves = ({ playbook, data, onSave, level }: MovesProps) => {
         {STATIC_SECTIONS.map((s) => (
           <MoveSection key={s.label} {...s} />
         ))}
+        <CustomMoves data={data} onSave={onSave} />
 
         <Collapse
           label={`${playbookLabel} Moves`}

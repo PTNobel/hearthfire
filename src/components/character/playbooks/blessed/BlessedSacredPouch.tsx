@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useOptimisticField } from '@/hooks/useOptimisticField';
-import { Divider, Radio, RadioGroup, Text } from '@/components/ui';
+import { CheckboxGroup, Divider, Radio, RadioGroup, Text } from '@/components/ui';
+import { bigMagicCount } from '@/lib/bigMagic';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
 import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
 import type { PlaybookSectionProps } from '@/types';
@@ -35,20 +36,22 @@ export const BlessedSacredPouch = ({ data, onSave }: BlessedSacredPouchProps) =>
     (next) => onSave(featurePatch(data, { sacredPouchIs: next })),
     'Failed to save.',
   );
-  const { value: trait, save: saveTrait } = useOptimisticField(
-    features.sacredPouchTrait ?? '',
-    (next) => onSave(featurePatch(data, { sacredPouchTrait: next })),
+  // Falls back to the legacy single-string field for characters saved before Big Magic support.
+  const { value: traits, ref: traitsRef, save: saveTraits } = useOptimisticField(
+    features.sacredPouchTraits ?? (features.sacredPouchTrait ? { [features.sacredPouchTrait]: true } : {}),
+    (next) => onSave(featurePatch(data, { sacredPouchTraits: next })),
     'Failed to save.',
   );
+  const traitPicks = 1 + bigMagicCount(data);
 
   const handleIs = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const key = e.currentTarget.dataset.key!;
     saveIs({ ...isRef.current, [key]: e.currentTarget.value });
   }, [saveIs]);
 
-  const handleTrait = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    saveTrait(e.currentTarget.value);
-  }, [saveTrait]);
+  const handleTrait = useCallback((id: string, checked: boolean) => {
+    saveTraits({ ...traitsRef.current, [id]: checked });
+  }, [saveTraits]);
 
   return (
     <PlaybookSection title="Sacred Pouch">
@@ -88,19 +91,15 @@ export const BlessedSacredPouch = ({ data, onSave }: BlessedSacredPouchProps) =>
 
         <Divider />
 
-        <Text size="xs" color="muted" className={styles.instruction}>What remarkable trait does it possess? (choose 1)</Text>
-        <RadioGroup legend="Remarkable trait" legendHidden className={styles.traits}>
-          {TRAITS.map((t) => (
-            <Radio
-              key={t}
-              name="sacred-pouch-trait"
-              value={t}
-              checked={trait === t}
-              onChange={handleTrait}
-              label={t}
-            />
-          ))}
-        </RadioGroup>
+        <Text size="xs" color="muted" className={styles.instruction}>
+          What remarkable trait does it possess? (choose {traitPicks})
+        </Text>
+        <CheckboxGroup
+          items={TRAITS}
+          checked={traits}
+          onChange={handleTrait}
+          max={traitPicks}
+        />
       </div>
     </PlaybookSection>
   );

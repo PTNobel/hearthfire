@@ -132,6 +132,10 @@
   --text-danger: var(--color-danger);
   --text-success: var(--color-success);
   --text-warning: var(--color-warning);
+  /* Ink for fixed-color fills (gold, --fill-danger). Not overridden in the light theme on
+     purpose: the fills don't flip, so the ink must not either. */
+  --text-on-gold: var(--color-forge-900);
+  --text-on-danger: #fff;
 
   /* Scrollbars — aged brass on a transparent track. No hover token: browsers
      derive their own hover and active shades from the thumb color. */
