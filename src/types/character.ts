@@ -227,6 +227,8 @@ export interface CharacterData {
   typeMoveCheckList?: Record<string, Record<string, boolean>>;
   typeMoveCheckListLevels?: Record<string, Record<string, number>>;
   typeMoveTakeNotes?: Record<string, string>;
+  // Player-authored moves, shown in the Custom Moves collapse. `text` is inline-markdown prose.
+  customMoves?: { id: string; name: string; text: string }[];
   specialPossessions?: Record<string, boolean>;
   specialPossessionUses?: Record<string, number>;
   specialPossessionCustom?: string;

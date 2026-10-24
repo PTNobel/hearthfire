@@ -25,9 +25,8 @@
 /* Variants */
 .primary {
   background-color: var(--color-gold-400);
-  /* Dark ink on the fixed-gold fill — gold palette tokens don't flip by theme,
-     so this stays dark (not a semantic --text-* token) in both light and dark. */
-  color: var(--color-forge-900);
+  /* Dark ink on the fixed-gold fill — gold doesn't flip by theme, so the ink doesn't either. */
+  color: var(--text-on-gold);
 }
 
 .primary:hover:not(:disabled) {
@@ -63,9 +62,8 @@
   /* --fill-danger, not the flipping --color-danger: white ink on ember-400
      (the dark-theme danger) is only ≈3:1; on the fixed fill it's ≈5.2:1. */
   background-color: var(--fill-danger);
-  /* Fixed-color fill like .primary above — needs fixed white text, not a
-     semantic --text-* token that would flip (and lose contrast) by theme. */
-  color: #fff;
+  /* Fixed-color fill like .primary above — fixed white ink that doesn't flip by theme. */
+  color: var(--text-on-danger);
 }
 
 .danger:hover:not(:disabled) {
