@@ -4,6 +4,8 @@ import type { Creature, FollowerData, PlaybookType } from './content';
 export interface BlessedFeatures {
   sacredPouchIs?: Record<string, string>;
   sacredPouchTrait?: string;
+  // Replaces sacredPouchTrait so Big Magic can add more picks; the legacy single string is still read.
+  sacredPouchTraits?: Record<string, boolean>;
   earthMotherShrine?: string;
   earthMotherOfferings?: Record<string, boolean>;
 }
