@@ -11,10 +11,10 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-vi.mock('@/lib/game', () => ({
-  createGameWithId: vi.fn(),
-  gameIdExists: vi.fn(),
-}));
+vi.mock('@/lib/game', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/game')>();
+  return { ...actual, createGameWithId: vi.fn(), gameIdExists: vi.fn() };
+});
 
 const mockGameIdExists = vi.mocked(gameIdExists);
 const mockCreateGame = vi.mocked(createGameWithId);
