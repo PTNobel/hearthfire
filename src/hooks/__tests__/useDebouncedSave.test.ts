@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDebouncedSave } from '../useDebouncedSave';
-import { addToastSpy, toastModuleMock } from '@/test/toastMock';
-
-vi.mock('@/components/app/Toast/ToastContext', () => toastModuleMock());
+const { addToastSpy } = vi.hoisted(() => ({ addToastSpy: vi.fn() }));
+vi.mock('@/components/app/Toast/ToastContext', () => ({
+  useToastOptional: () => ({ addToast: addToastSpy }),
+}));
 beforeEach(() => addToastSpy.mockClear());
 
 describe('local draft acceptance', () => {
