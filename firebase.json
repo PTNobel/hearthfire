@@ -39,12 +39,7 @@
           {
             "key": "Cross-Origin-Opener-Policy",
             "value": "same-origin"
-          }
-        ]
-      },
-      {
-        "source": "**",
-        "headers": [
+          },
           {
             "key": "Referrer-Policy",
             "value": "no-referrer"
