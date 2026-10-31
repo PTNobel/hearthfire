@@ -39,7 +39,7 @@ const mount = async () => {
 };
 const commit = async () => {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
-  await getGameSync(id).send();
+  await act(async () => { await getGameSync(id).send(); });
   const state = getGameSync(id).getSnapshot();
   if (state.queue.error) throw new Error(state.queue.error);
 };
