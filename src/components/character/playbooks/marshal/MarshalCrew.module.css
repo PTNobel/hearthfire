@@ -169,3 +169,20 @@
 .individualTraits:focus-visible {
   border-color: var(--border-accent);
 }
+
+.npcLink {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-2);
+}
+
+.npcLink > * {
+  max-width: 100%;
+}
+
+.npcLinkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
