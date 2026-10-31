@@ -454,12 +454,12 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
           <span className={styles.hoverCategory}>{details.category}</span>
           {details.facts.length > 0 && (
             <ul className={styles.hoverFacts}>
-              {details.facts.map((fact, i) => <li key={i}>{fact}</li>)}
+              {details.facts.map((fact, i) => <li key={`fact-${fact}-${i}`}>{fact}</li>)}
             </ul>
           )}
           {details.connections.length > 0 && (
             <div className={styles.hoverConnections}>
-              {details.connections.slice(0, 8).map((link, i) => <div key={i}>{link}</div>)}
+              {details.connections.slice(0, 8).map((link, i) => <div key={`connection-${link}-${i}`}>{link}</div>)}
               {details.connections.length > 8 && <div>+{details.connections.length - 8} more relationships</div>}
             </div>
           )}
