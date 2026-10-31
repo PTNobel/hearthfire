@@ -1,4 +1,6 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDocFromServer } from 'firebase/firestore';
+import type { GameSync } from '@/lib/gameSync';
+import { changeQueue, type DraftQueue } from '@/lib/syncStorage';
 import { db } from '@/lib/firebase';
 import { GAMES_COLLECTION } from '@/lib/constants';
 import { slugifyGameId } from '@/lib/game';
@@ -49,9 +51,41 @@ const hasNestedArray = (v: unknown): boolean => {
 // parseGameSession; this one deliberately doesn't, because a backup has to carry the
 // fields the current build doesn't know about too.
 export const readRawGame = async (gameId: string): Promise<Record<string, unknown>> => {
-  const snap = await getDoc(doc(db, GAMES_COLLECTION, gameId));
+  // A backup must represent acknowledged server data, not an older offline
+  // cache entry (nor a Firestore local write awaiting acknowledgment).
+  const snap = await getDocFromServer(doc(db, GAMES_COLLECTION, gameId));
   if (!snap.exists()) throw new Error('Game not found — it may have been deleted.');
+  if (snap.metadata?.fromCache || snap.metadata?.hasPendingWrites) {
+    throw new Error('A confirmed server snapshot is not available. Sync your edits and retry.');
+  }
   return snap.data() as Record<string, unknown>;
+};
+
+export class UnsyncedBackupError extends Error {
+  constructor() {
+    super('Sync or resolve your local changes before exporting a complete game backup.');
+    this.name = 'UnsyncedBackupError';
+  }
+}
+
+const hasOutstandingDrafts = (queue: Pick<DraftQueue, 'pending' | 'sending' | 'conflict'>): boolean =>
+  queue.pending.length > 0 || !!queue.sending || !!queue.conflict;
+
+// Check both in-memory drafts (which may not have reached IndexedDB) and the
+// shared durable queue (which can also be updated by a different browser tab).
+export const verifyBackupReady = async (
+  gameId: string,
+  store: GameSync | null,
+  openFieldEdits = 0,
+): Promise<void> => {
+  if (!store && openFieldEdits === 0) return; // No active game context (e.g. standalone UI tests).
+  if (openFieldEdits > 0 || store?.getSnapshot().localWrites) throw new UnsyncedBackupError();
+  const local = store?.getRecovery();
+  if (local && (hasOutstandingDrafts(local) || local.unpersisted.length > 0)) {
+    throw new UnsyncedBackupError();
+  }
+  const persisted = await changeQueue(gameId);
+  if (hasOutstandingDrafts(persisted)) throw new UnsyncedBackupError();
 };
 
 export const buildEnvelope = (
@@ -95,8 +129,16 @@ export const downloadJson = (filename: string, payload: unknown): void => {
 
 // Read the live doc, wrap it, and hand the browser a file. Returns the filename so the
 // caller can name it in a toast. `suffix` tags the automatic pre-import safety copy.
-export const exportGame = async (gameId: string, suffix?: string): Promise<string> => {
+export const exportGame = async (
+  gameId: string,
+  suffix?: string,
+  verifyReady?: () => Promise<void>,
+): Promise<string> => {
+  await verifyReady?.();
   const game = await readRawGame(gameId);
+  // The server request may have taken time; do not label an incomplete snapshot
+  // a successful backup if someone edited locally during that request.
+  await verifyReady?.();
   const exportedAt = new Date();
   const envelope = buildEnvelope(gameId, game, exportedAt);
   const filename = exportFilename(gameId, envelope.gameName, exportedAt, suffix);

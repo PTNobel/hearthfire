@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { firestoreMockModule, firestoreStore } from '@/test/firestoreMock';
+import { getDocFromServer } from 'firebase/firestore';
+import { changeQueue, emptyQueue } from '@/lib/syncStorage';
+import type { GameSync } from '@/lib/gameSync';
 
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
 vi.mock('firebase/firestore', () => firestoreMockModule());
@@ -25,6 +28,8 @@ import {
   exportGame,
   readImportFile,
   readRawGame,
+  verifyBackupReady,
+  UnsyncedBackupError,
 } from '../gameBackup';
 
 const EXPORTED_AT = new Date('2026-08-17T14:30:00.000Z');
@@ -118,6 +123,17 @@ describe('readRawGame', () => {
     firestoreStore.set('games/long-winter', raw);
 
     await expect(readRawGame('long-winter')).resolves.toEqual(raw);
+    expect(getDocFromServer).toHaveBeenCalled();
+  });
+
+  it('rejects a cache-only or unacknowledged read', async () => {
+    const raw = gameDoc();
+    vi.mocked(getDocFromServer).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => raw,
+      metadata: { fromCache: true, hasPendingWrites: false },
+    } as never);
+    await expect(readRawGame('long-winter')).rejects.toThrow('confirmed server snapshot');
   });
 
   it('throws when the game does not exist', async () => {
@@ -178,6 +194,16 @@ describe('exportGame', () => {
 
     await expect(exportGame('long-winter', 'before-import'))
       .resolves.toMatch(/^hearthfire-the-long-winter-before-import-\d{4}-\d{2}-\d{2}\.json$/);
+  });
+
+  it('rechecks for local edits after the server read and skips the download if edits appeared', async () => {
+    firestoreStore.set('games/long-winter', gameDoc());
+    let checks = 0;
+    await expect(exportGame('long-winter', undefined, async () => {
+      if (++checks === 2) throw new UnsyncedBackupError();
+    })).rejects.toBeInstanceOf(UnsyncedBackupError);
+    expect(checks).toBe(2);
+    expect(click).not.toHaveBeenCalled();
   });
 
   it('does not download anything when the game is missing', async () => {
