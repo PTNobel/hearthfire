@@ -132,10 +132,12 @@ describe('useGame mutations', () => {
 
     // The doc gains 'c' after this client's drag started, so its stale `ids` list
     // only knows about 'a' and 'b'.
-    firestoreStore.set(GAME_PATH, { name: '', createdAt: 0, characters: [char('a'), char('b'), char('c')] });
-
     await act(async () => {
-      await result.current.reorderCharacters([char('b'), char('a')]);
+      firestoreStore.set(GAME_PATH, { name: '', createdAt: 0, characters: [char('a'), char('b'), char('c')] });
+  
+      await act(async () => {
+        await result.current.reorderCharacters([char('b'), char('a')]);
+      });
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['b', 'a', 'c']);
@@ -204,12 +206,14 @@ describe('useGame mutations', () => {
 
     // Another client concurrently adds a second entry the first client's stale
     // snapshot never saw.
-    firestoreStore.set(GAME_PATH, {
-      name: '', createdAt: 0,
-      characters: [char('a', { data: { arcanaMinor: [
-        { id: 'm1', requirementsChecked: {} },
-        { id: 'm2', requirementsChecked: {} },
-      ] } } as Partial<Character>)],
+    await act(async () => {
+      firestoreStore.set(GAME_PATH, {
+        name: '', createdAt: 0,
+        characters: [char('a', { data: { arcanaMinor: [
+          { id: 'm1', requirementsChecked: {} },
+          { id: 'm2', requirementsChecked: {} },
+        ] } } as Partial<Character>)],
+      });
     });
 
     // The first client's save only carries its own (still stale) view: an edit to m1.
@@ -336,9 +340,11 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     // The GM concurrently adds a second resident the player's stale snapshot never saw.
-    firestoreStore.set(GAME_PATH, {
-      name: '', createdAt: 0, characters: [],
-      steading: { residents: [{ id: 'n1', name: 'Mara' }, { id: 'n2', name: 'Boro' }] },
+    await act(async () => {
+      firestoreStore.set(GAME_PATH, {
+        name: '', createdAt: 0, characters: [],
+        steading: { residents: [{ id: 'n1', name: 'Mara' }, { id: 'n2', name: 'Boro' }] },
+      });
     });
 
     // The player's save only carries their own (still stale) view: a rename of n1.
@@ -414,9 +420,11 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     // The GM concurrently adds a second slot the player's stale snapshot never saw.
-    firestoreStore.set(GAME_PATH, {
-      name: '', createdAt: 0, characters: [],
-      steading: { gmImprovements: [gi1, gi2] },
+    await act(async () => {
+      firestoreStore.set(GAME_PATH, {
+        name: '', createdAt: 0, characters: [],
+        steading: { gmImprovements: [gi1, gi2] },
+      });
     });
 
     await act(async () => {
@@ -446,7 +454,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     // The doc vanishes (e.g. concurrent delete) so the next write throws.
-    firestoreStore.delete(GAME_PATH);
+    await act(async () => { firestoreStore.delete(GAME_PATH); });
 
     await act(async () => {
       // Direct save paths only have .finally(); reportSave must surface the
@@ -465,7 +473,7 @@ describe('useGame mutations', () => {
 
     // The doc is deleted mid-session; a transaction-backed write must fail loud
     // rather than resolve, so reportSave doesn't flag "Saved." for a no-op.
-    firestoreStore.delete(GAME_PATH);
+    await act(async () => { firestoreStore.delete(GAME_PATH); });
 
     await act(async () => {
       await expect(result.current.updateCharacterName('a', 'Renamed')).rejects.toThrow();
@@ -559,9 +567,11 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     // Another client's roll lands in the doc after this client's snapshot was taken.
-    firestoreStore.set(GAME_PATH, {
-      name: '', createdAt: 0, characters: [char('a')],
-      diceRolls: [roll('theirs', { createdAt: 5 })],
+    await act(async () => {
+      firestoreStore.set(GAME_PATH, {
+        name: '', createdAt: 0, characters: [char('a')],
+        diceRolls: [roll('theirs', { createdAt: 5 })],
+      });
     });
 
     await act(async () => { await result.current.logRoll(roll('mine', { createdAt: 9 })); });
@@ -684,7 +694,7 @@ describe('useGame mutations', () => {
 
     it('a failed release surfaces the save-error toast', async () => {
       const result = await loaded();
-      firestoreStore.delete(GAME_PATH);
+      await act(async () => { firestoreStore.delete(GAME_PATH); });
       await act(async () => {
         await expect(result.current.releaseNotesLock('gm', '<p>x</p>')).rejects.toThrow();
       });
