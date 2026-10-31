@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createGameWithId, gameIdExists } from '@/lib/game';
@@ -32,18 +32,18 @@ describe('Home', () => {
     await userEvent.type(screen.getByLabelText(/session id/i), 'abcdef0123456789');
     await userEvent.click(screen.getByRole('button', { name: /open game/i }));
     expect(mockGameIdExists).toHaveBeenCalledWith('abcdef0123456789');
-    expect(mockNavigate).toHaveBeenCalledWith('/game/abcdef0123456789');
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/game/abcdef0123456789'));
     expect(mockCreateGame).not.toHaveBeenCalled();
   });
 
   it('creates the authorized game the first time it is opened', async () => {
     mockGameIdExists.mockResolvedValue(false);
-    mockCreateGame.mockResolvedValue();
+    mockCreateGame.mockResolvedValue(undefined);
     renderWithProviders(<Home />);
     await userEvent.type(screen.getByLabelText(/session id/i), 'abcdef0123456789');
     await userEvent.click(screen.getByRole('button', { name: /open game/i }));
     expect(mockCreateGame).toHaveBeenCalledWith('abcdef0123456789');
-    expect(mockNavigate).toHaveBeenCalledWith('/game/abcdef0123456789', { state: { isNew: true } });
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/game/abcdef0123456789', { state: { isNew: true } }));
   });
 
   it('displays an error when Firestore rejects an invalid ID', async () => {
