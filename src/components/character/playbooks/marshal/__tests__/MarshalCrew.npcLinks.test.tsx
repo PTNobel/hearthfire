@@ -60,6 +60,9 @@ describe('Marshal crew and shared Steading NPCs', () => {
     const nameInput = screen.getByRole('textbox', { name: 'Individual 1 name' });
     expect(nameInput).toHaveValue('Aled the Scout');
     expect(nameInput).toHaveAttribute('readonly');
+    const traitsInput = screen.getByRole('textbox', { name: 'Individual 1 traits' });
+    expect(traitsInput).toHaveValue('fearless');
+    expect(traitsInput).toHaveAttribute('readonly');
 
     await user.click(screen.getByRole('button', { name: 'Edit Steading NPC for individual 1' }));
     const dialog = screen.getByRole('dialog');
@@ -86,7 +89,9 @@ describe('Marshal crew and shared Steading NPCs', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save NPC' }));
     await waitFor(() => expect(onCreateNpc).toHaveBeenCalledTimes(1));
     expect(onCreateNpc.mock.calls[0][0]).toBe(0);
-    expect(onCreateNpc.mock.calls[0][1]).toMatchObject({ name: 'Mara', occupation: 'Soldier' });
+    expect(onCreateNpc.mock.calls[0][1]).toMatchObject({
+      name: 'Mara', occupation: 'Soldier', traits: ['a scout'],
+    });
     expect(onCreateNpc.mock.calls[0][1].id).toBeTruthy();
   });
 });
