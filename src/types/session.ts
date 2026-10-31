@@ -31,6 +31,8 @@ export interface SteadingNPC {
   dead?: boolean;
 }
 
+export type SteadingNpcForm = Required<Pick<SteadingNPC, 'name' | 'pronouns' | 'occupation' | 'traits' | 'relationships' | 'notes'>>;
+
 export type SteadingSize = 'hamlet' | 'village' | 'town' | 'city';
 
 export interface GmImprovement {

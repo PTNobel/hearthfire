@@ -4,7 +4,7 @@ import { diffValues, readPath, sameValue, type PathPart } from '@/lib/syncChange
 import { mergeById, STEADING_ID_ARRAY_FIELDS, stripUndefined } from '@/lib/gameMutations';
 import { isPlainObject } from '@/lib/typeGuards';
 import type { DraftEdit } from '@/lib/syncStorage';
-import type { Character, CharacterData, ContentLists, GameSession, LoggedRoll, SteadingData } from '@/types';
+import type { Character, CharacterData, ContentLists, GameSession, LoggedRoll, SteadingData, SteadingNPC, SteadingNpcForm } from '@/types';
 
 export { parseCharacterData, parseCharacters, parseContent, parseSteading } from '@/lib/gameParsing';
 
@@ -21,6 +21,9 @@ export interface UseGameResult {
   updateContent: (field: keyof ContentLists, value: string) => Promise<void>;
   updateField: (field: keyof Pick<GameSession, 'threats' | 'iWonder'>, value: string) => Promise<void>;
   updateSteading: (patch: Partial<SteadingData>, base?: Partial<SteadingData>) => Promise<void>;
+  setCrewNpcLink: (characterId: string, slot: number, npcId: string | null) => Promise<void>;
+  createCrewNpc: (characterId: string, slot: number, npc: SteadingNPC) => Promise<void>;
+  updateCrewNpc: (npcId: string, before: SteadingNpcForm, after: SteadingNpcForm) => Promise<void>;
   addCharacter: (character: Character) => Promise<void>;
   removeCharacter: (characterId: string) => Promise<void>;
   reorderCharacters: (characters: Character[]) => Promise<void>;
@@ -102,6 +105,60 @@ export const useGame = (gameId: string): UseGameResult => {
     return edit(['steading'], stripUndefined(base), stripUndefined(next), 'Steading changes');
   }, [game, edit]);
 
+
+  // A crew slot links to an existing Steading NPC by stable ID. Keep the
+  // association separate from crewIndividuals: those six positional entries
+  // have no entity IDs, and rewriting the entire array can lose parallel edits.
+  const crewLinkPath = (characterId: string, slot: number): PathPart[] => [
+    'characters', { id: characterId }, 'data', 'playbookFeatures', 'crewNpcLinks', String(slot),
+  ];
+  const validateCrewSlot = (characterId: string, slot: number) => {
+    if (!Number.isInteger(slot) || slot < 0 || slot >= 6) throw new Error('Invalid crew slot.');
+    const character = game?.characters.find((c) => c.id === characterId && c.playbook === 'marshal');
+    if (!character) throw new Error('Marshal character not found.');
+    return character;
+  };
+  const setCrewNpcLink = useCallback((characterId: string, slot: number, npcId: string | null) => {
+    const character = validateCrewSlot(characterId, slot);
+    if (npcId !== null) {
+      if (![...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])].some((npc) => npc.id === npcId)) {
+        return Promise.reject(new Error('This Steading NPC no longer exists.'));
+      }
+      const links = character.data?.playbookFeatures?.crewNpcLinks ?? {};
+      if (Object.entries(links).some(([key, id]) => Number(key) !== slot && id === npcId)) {
+        return Promise.reject(new Error('This NPC is already linked to another crew member.'));
+      }
+    }
+    const path = crewLinkPath(characterId, slot);
+    return edit(path, readPath(raw, path), npcId ?? undefined, 'Link crew member to Steading NPC');
+  }, [game, raw, edit]);
+
+  const createCrewNpc = useCallback((characterId: string, slot: number, npc: SteadingNPC): Promise<void> => {
+    validateCrewSlot(characterId, slot);
+    if (!raw) return Promise.reject(new Error('Load this game before adding an NPC.'));
+    if (!npc.id || !npc.name.trim()) return Promise.reject(new Error('Give this NPC a name.'));
+    if ([...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])].some((n) => n.id === npc.id)) {
+      return Promise.reject(new Error('This NPC already exists.'));
+    }
+    const linkPath = crewLinkPath(characterId, slot);
+    if (readPath(raw, linkPath) !== undefined) {
+      return Promise.reject(new Error('Unlink the current NPC before creating another.'));
+    }
+    // One immutable queued edit creates the Steading resident AND links the
+    // Marshal's slot, so an interrupted save cannot commit only half the work.
+    return store.enqueue(raw, [
+      { path: ['steading', 'residents', { id: npc.id }], before: undefined, after: { ...npc, name: npc.name.trim() } },
+      { path: linkPath, before: undefined, after: npc.id },
+    ], 'Add Marshal crew member to Steading');
+  }, [game, raw, store]);
+
+  const updateCrewNpc = useCallback((npcId: string, before: SteadingNpcForm, after: SteadingNpcForm) => {
+    const section = game?.steading?.residents?.some((npc) => npc.id === npcId) ? 'residents'
+      : game?.steading?.neighbors?.some((npc) => npc.id === npcId) ? 'neighbors' : null;
+    if (!section) return Promise.reject(new Error('This Steading NPC no longer exists.'));
+    return edit(['steading', section, { id: npcId }], before, after, 'Crew NPC details');
+  }, [game, edit]);
+
   const logRoll = useCallback((roll: LoggedRoll) => {
     const existing = game?.diceRolls?.find((r) => r.id === roll.id);
     return edit(['diceRolls', { id: roll.id }], existing, stripUndefined(roll), 'Dice roll');
@@ -130,6 +187,6 @@ export const useGame = (gameId: string): UseGameResult => {
   }, [edit, store]);
 
   return { game, loading, error, updateGameName, updateCharacterName, updateCharacterData, adjustCharacterStats,
-    updateContent, updateField, updateSteading, addCharacter, removeCharacter, reorderCharacters, logRoll,
+    updateContent, updateField, updateSteading, setCrewNpcLink, createCrewNpc, updateCrewNpc, addCharacter, removeCharacter, reorderCharacters, logRoll,
     updateNotes, claimNotesLock: store.claimNotes, refreshNotesLock: store.refreshNotes, releaseNotesLock, replaceGameData };
 };
