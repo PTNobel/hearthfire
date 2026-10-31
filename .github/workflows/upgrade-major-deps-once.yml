@@ -1,0 +1,39 @@
+name: Upgrade Firebase and Vitest majors once (temporary)
+
+on:
+  push:
+    branches: [dependency-upgrades-2026-10]
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: dependency-upgrades-2026-10
+          persist-credentials: true
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Update Firebase and Vitest majors
+        run: |
+          npm install --package-lock-only --no-fund --save 'firebase@^13.1.0'
+          npm install --package-lock-only --no-fund --save-dev 'vitest@^5.0.5' '@vitest/ui@^5.0.5'
+          npm audit fix --package-lock-only --no-fund || echo 'Residual issues require reviewed changes.'
+      - name: Report remaining advisories
+        run: |
+          npm audit --json > /tmp/audit.json || true
+          node -e "const r=require('/tmp/audit.json'); console.log('Remaining audit counts:',JSON.stringify(r.metadata?.vulnerabilities||{})); console.log('Affected:',Object.entries(r.vulnerabilities||{}).map(([k,v])=>k+':'+v.severity).join(', '));"
+      - name: Commit package updates and self-remove
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/upgrade-major-deps-once.yml
+          git add package.json package-lock.json
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "Upgrade Firebase 13 and Vitest 5"
+          git push origin HEAD:dependency-upgrades-2026-10
