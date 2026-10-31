@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { PageMeta } from '@/components/app/PageMeta/PageMeta';
 import { PageLayout } from '@/components/app/PageLayout/PageLayout';
 import { createGameWithId, gameIdExists } from '@/lib/game';
+import { saveSessionGameId } from '@/lib/sessionGame';
 import { Button, Heading, Icon, Input, RuleDivider, Stack, Text } from '@/components/ui';
 import styles from './Home.module.css';
 
@@ -21,20 +22,25 @@ export const Home = () => {
     setError('');
 
     try {
+      const openGame = (isNew: boolean) => {
+        // Store the credential only after Firestore accepts it.
+        saveSessionGameId(id);
+        navigate('/game', isNew ? { state: { isNew: true } } : undefined);
+      };
       const exists = await gameIdExists(id);
       if (!exists) {
         // The first player creates the sole permitted game. Firestore rules
         // reject all other IDs even if clients bypass this UI.
         try {
           await createGameWithId(id);
-          navigate('/game/' + encodeURIComponent(id), { state: { isNew: true } });
+          openGame(true);
         } catch (err) {
           // Another player may have created the game in the meantime.
           if (!(err instanceof Error && err.message === 'Game ID already taken.')) throw err;
-          navigate('/game/' + encodeURIComponent(id));
+          openGame(false);
         }
       } else {
-        navigate('/game/' + encodeURIComponent(id));
+        openGame(false);
       }
     } catch {
       setError('Invalid session ID or unable to reach the game.');
@@ -68,11 +74,12 @@ export const Home = () => {
             <Heading as="h2" size="label">Open Game</Heading>
             <form onSubmit={handleOpen} className={styles.cardBody}>
               <Text color="muted" size="xs">
-                Enter your group's private session ID. The game is created the first time it is opened.
+                Enter your group's private session ID. It's kept in this tab, not in the URL. The game is created the first time it is opened.
               </Text>
               <Stack gap={2}>
                 <Input
                   id="session-id"
+                  type="password"
                   label="Session ID"
                   placeholder="Shared session ID"
                   value={sessionId}

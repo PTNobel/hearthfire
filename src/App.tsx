@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ToastProvider, SaveStatusProvider, SaveStatus, ErrorBoundary } from "@/components/app";
 import { Spinner } from "@/components/ui";
+import { SessionRoute } from '@/components/app/SessionRoute';
 import styles from "./App.module.css";
 
 /*
@@ -43,10 +44,10 @@ const NotFound = lazy(() =>
  *
  * Route map:
  *   /                        → Home
- *   /game/:id                → Game (party overview)
- *   /game/:id/gm             → GM Playbook
- *   /game/:id/steading       → Steading Playbook
- *   /game/:id/:playbook      → Character Playbook (one per playbook type)
+ *   /game                    → Game (party overview, secret in sessionStorage)
+ *   /game/gm                 → GM Playbook
+ *   /game/steading           → Steading Playbook
+ *   /game/:playbook          → Character Playbook
  *   *                        → NotFound (404)
  *
  * SiteBanner, the TopBar wordmark, and the footer are all handled inside
@@ -69,10 +70,12 @@ export const App = () => {
       >
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/game/:id" element={<Game />} />
-          <Route path="/game/:id/gm" element={<GmPlaybook />} />
-          <Route path="/game/:id/steading" element={<SteadingPlaybook />} />
-          <Route path="/game/:id/:playbook" element={<CharacterPlaybook />} />
+          <Route element={<SessionRoute />}>
+            <Route path="/game" element={<Game />} />
+            <Route path="/game/gm" element={<GmPlaybook />} />
+            <Route path="/game/steading" element={<SteadingPlaybook />} />
+            <Route path="/game/:playbook" element={<CharacterPlaybook />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
