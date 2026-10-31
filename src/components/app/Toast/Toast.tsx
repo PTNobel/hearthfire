@@ -140,8 +140,9 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     timers.current.set(id, setTimeout(() => startExit(id), AUTO_DISMISS_MS));
   }, [startExit]);
 
+    const savedTimers = timers.current;
   useEffect(() => {
-    return () => { timers.current.forEach(clearTimeout); };
+    return () => { savedTimers.forEach(clearTimeout); };
   }, []);
 
   // Stable context value — every saving component subscribes to this context,

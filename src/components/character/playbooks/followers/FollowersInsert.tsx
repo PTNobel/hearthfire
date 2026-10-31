@@ -490,14 +490,14 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
     flushDebounce({ followers: followersRef.current }).catch(() =>
       addToast("Failed to save.", "error"),
     );
-  }, [flushDebounce, addToast]);
+  }, [flushDebounce, addToast, followersRef]);
 
   const handleAdd = useCallback(() => {
     const prev = followersRef.current;
     const next = [...prev, normalizeFollower(undefined, generateId())];
     setFollowers(next);
     saveFollowers(next, prev);
-  }, [saveFollowers]);
+  }, [saveFollowers, followersRef]);
 
   const handleRemove = useCallback(
     (id: string) => {
@@ -506,7 +506,7 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
       setFollowers(next);
       saveFollowers(next, prev);
     },
-    [saveFollowers],
+    [saveFollowers, followersRef],
   );
 
   const handleFieldChange = useCallback(
@@ -520,7 +520,7 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
         saveFollowersDebounced(next);
       }
     },
-    [saveFollowers, saveFollowersDebounced],
+    [saveFollowers, saveFollowersDebounced, followersRef],
   );
 
   const handleGearCheckedChange = useCallback(
@@ -535,7 +535,7 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
       setFollowers(next);
       saveFollowers(next, prev);
     },
-    [saveFollowers],
+    [saveFollowers, followersRef],
   );
 
   const handleGearTextChange = useCallback(
@@ -550,7 +550,7 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
       setFollowers(next);
       saveFollowersDebounced(next);
     },
-    [saveFollowersDebounced],
+    [saveFollowersDebounced, followersRef],
   );
 
   const handleMoveChange = useCallback(
@@ -565,7 +565,7 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
       setFollowers(next);
       saveFollowersDebounced(next);
     },
-    [saveFollowersDebounced],
+    [saveFollowersDebounced, followersRef],
   );
 
   const handleLoyaltyChange = useCallback(
@@ -575,7 +575,7 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
       setFollowers(next);
       saveFollowers(next, prev);
     },
-    [saveFollowers],
+    [saveFollowers, followersRef],
   );
 
   return (
