@@ -74,7 +74,7 @@ export const Home = () => {
             <Heading as="h2" size="label">Open Game</Heading>
             <form onSubmit={handleOpen} className={styles.cardBody}>
               <Text color="muted" size="xs">
-                Enter your group's private session ID. It's kept in this tab, not in the URL. The game is created the first time it is opened.
+                Enter your session ID.
               </Text>
               <Stack gap={2}>
                 <Input
