@@ -6,6 +6,7 @@ import { ALL_PLAYBOOK_MOVES } from '@/lib/moves/allPlaybookMoves';
 import { LIGHTBEARER_INVOCATIONS } from '@/lib/moves/lightbearerInvocations';
 import { REVENANT_MOVES, GHOST_MOVES, THRALL_MOVES, THRALL_MARK_DEFINITIONS } from '@/lib/moves/inserts';
 import type { MoveDefinition } from '@/types';
+import { moveSearchText, normalizeMoveSearchText } from '@/lib/moves/moveSearchText';
 import styles from './MoveSearch.module.css';
 
 const ALL_MOVES = [
@@ -22,6 +23,9 @@ const ALL_MOVES = [
   ...THRALL_MARK_DEFINITIONS,
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+// Precompute the searchable text once, not on every keystroke.
+const SEARCHABLE_MOVES = ALL_MOVES.map((move) => ({ move, text: moveSearchText(move) }));
+
 const MoveList = ({ moves }: { moves: MoveDefinition[] }) => (
   <ul className={styles.list}>
     {moves.map((move) => (
@@ -37,9 +41,9 @@ export const MoveSearch = () => {
   const resultHintId = useId();
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeMoveSearchText(query);
     if (!q) return [];
-    return ALL_MOVES.filter((m) => m.name.toLowerCase().includes(q));
+    return SEARCHABLE_MOVES.filter(({ text }) => text.includes(q)).map(({ move }) => move);
   }, [query]);
 
   const mid = Math.ceil(results.length / 2);
@@ -49,10 +53,10 @@ export const MoveSearch = () => {
   return (
     <div className={styles.root}>
       <Input
-        placeholder="Search moves by name…"
+        placeholder="Search move names and text…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Search moves by name"
+        aria-label="Search moves by name or text"
         aria-describedby={query.trim() ? resultHintId : undefined}
         className={styles.input}
       />
