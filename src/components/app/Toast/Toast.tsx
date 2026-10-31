@@ -141,7 +141,8 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   }, [startExit]);
 
   useEffect(() => {
-    return () => { timers.current.forEach(clearTimeout); };
+    const savedTimers = timers.current;
+    return () => { savedTimers.forEach(clearTimeout); };
   }, []);
 
   // Stable context value — every saving component subscribes to this context,

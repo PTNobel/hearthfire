@@ -306,32 +306,32 @@ export const BlessedInitiatesOfDanu = ({ data, onSave }: BlessedInitiatesOfDanuP
     const next = { ...hpRef.current, [initiateValue]: value };
     setHp(next);
     saveDebounced({ initiateHp: next }, () => addToast('Failed to save.', 'error'));
-  }, [saveDebounced, addToast]);
+  }, [saveDebounced, addToast, hpRef]);
 
   const handleHpBlur = useCallback(() => {
     flushDebounce({ initiateHp: hpRef.current }).catch(() => addToast('Failed to save.', 'error'));
-  }, [flushDebounce, addToast]);
+  }, [flushDebounce, addToast, hpRef]);
 
   const handleLoyaltyChange = useCallback((initiateValue: string, n: number) => {
     const prev = loyaltyRef.current;
     const next = { ...prev, [initiateValue]: n };
     setLoyalty(next);
     saveImmediate({ initiateLoyalty: next }).catch(() => { setLoyalty(prev); addToast('Failed to save.', 'error'); });
-  }, [saveImmediate, addToast]);
+  }, [saveImmediate, addToast, loyaltyRef]);
 
   const handlePickChange = useCallback((initiateValue: string, lineKey: string, option: string) => {
     const prev = picksRef.current;
     const next = { ...prev, [initiateValue]: { ...(prev[initiateValue] ?? {}), [lineKey]: option } };
     setPicks(next);
     saveImmediate({ initiatePicks: next }).catch(() => { setPicks(prev); addToast('Failed to save.', 'error'); });
-  }, [saveImmediate, addToast]);
+  }, [saveImmediate, addToast, picksRef]);
 
   const handleRitesChange = useCallback((initiateValue: string, value: string) => {
     const prev = ritesRef.current;
     const next = { ...prev, [initiateValue]: value };
     setRites(next);
     saveImmediate({ initiateRites: next }).catch(() => { setRites(prev); addToast('Failed to save.', 'error'); });
-  }, [saveImmediate, addToast]);
+  }, [saveImmediate, addToast, ritesRef]);
 
   const chosen = data?.backgroundChoices ?? [];
   const visibleInitiates = INITIATES.filter((i) => chosen.includes(i.value));

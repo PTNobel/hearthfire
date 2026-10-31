@@ -29,11 +29,11 @@ export const useConsequenceCheckboxes = (
 
   const handleChange = useCallback((id: string, isChecked: boolean) => {
     save({ ...checkedRef.current, [id]: isChecked });
-  }, [save]);
+  }, [save, checkedRef]);
 
   const updateChecked = useCallback((updater: (prev: Record<string, boolean>) => Record<string, boolean>) => {
     save(updater(checkedRef.current));
-  }, [save]);
+  }, [save, checkedRef]);
 
   const items = useMemo(() => labels.map((c) => ({
     id: c.id,

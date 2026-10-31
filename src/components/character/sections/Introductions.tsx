@@ -65,21 +65,21 @@ export const Introductions = ({ config, data, onSave }: IntroductionsProps = {})
 
   const handleQuestion = useCallback((id: string, checked: boolean) => {
     saveQuestions({ ...questionsRef.current, [id]: checked });
-  }, [saveQuestions]);
+  }, [saveQuestions, questionsRef]);
 
   const handleAnswerChange = useCallback((stepId: string, value: string) => {
     const next = { ...answersRef.current, [stepId]: value };
     setAnswers(next);
     answersPendingRef.current = true;
     debouncedSaveAnswers(next);
-  }, [setAnswers, debouncedSaveAnswers, answersPendingRef]);
+  }, [setAnswers, debouncedSaveAnswers, answersPendingRef, answersRef]);
 
   const handleAnswerBlur = useCallback((stepId: string, value: string) => {
     const next = { ...answersRef.current, [stepId]: value };
     setAnswers(next);
     answersPendingRef.current = true;
     flushAnswers(next);
-  }, [setAnswers, flushAnswers, answersPendingRef]);
+  }, [setAnswers, flushAnswers, answersPendingRef, answersRef]);
 
   const items = useMemo(() => {
     if (!config) return [];

@@ -6,19 +6,7 @@ import type { MajorArcanum, ArcanaMajorEntry, Creature, CharacterData } from '@/
 import { MajorArcanaCard } from './MajorArcanaCard';
 import { AddArcanaModal } from './AddArcanaModal';
 import styles from './ArcanaPanel.module.css';
-
-// Set an entry's marks and latch `everUnlocked` the first time marks reach the unlock threshold (the
-// tracker's `unlockAt`, or its `max` when unspecified). Once latched it never clears, so an arcanum that
-// erases all marks after each unlock keeps its Mysteries revealed. Never un-latches: erasing marks is
-// the intended flow, not a mistake to undo.
-export const withMarks = (entry: ArcanaMajorEntry, marksValue: number): ArcanaMajorEntry => {
-  const marksTracker = MAJOR_ARCANA.find((m) => m.id === entry.id)?.frontTrackers.find(
-    (t) => t.role === 'marks',
-  );
-  const threshold = marksTracker?.unlockAt ?? marksTracker?.max ?? 0;
-  const everUnlocked = entry.everUnlocked || (threshold > 0 && marksValue >= threshold);
-  return { ...entry, marksValue, everUnlocked };
-};
+import { withMarks } from './withMarks';
 
 interface MajorArcanaCardRowProps {
   entry: ArcanaMajorEntry;
@@ -91,21 +79,21 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
       saveMajor([...arcanaMajorRef.current, entry]);
       setMajorModalOpen(false);
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleRemoveMajor = useCallback(
     (id: string) => {
       saveMajor(arcanaMajorRef.current.filter((a) => a.id !== id), id);
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMajorMarksChange = useCallback(
     (id: string, value: number) => {
       saveMajor(arcanaMajorRef.current.map((a) => (a.id === id ? withMarks(a, value) : a)));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMysteryMoveToggle = useCallback(
@@ -116,7 +104,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
           : a,
       ));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleConsequenceToggle = useCallback(
@@ -180,7 +168,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
           : a,
       ));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMajorTrackerChange = useCallback(
@@ -191,7 +179,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
           : a,
       ));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMajorFollowerHpChange = useCallback(
@@ -204,7 +192,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
         return { ...a, followerHp: { ...a.followerHp, [moveId]: updated } };
       }));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMajorBodyCheckChange = useCallback(
@@ -221,7 +209,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
           : a,
       ));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMajorBodyInputChange = useCallback(
@@ -238,7 +226,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
           : a,
       ));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleMysteryCreatureSave = useCallback(
@@ -247,7 +235,7 @@ export const MajorArcanaPanel = ({ arcanaMajor, arcanaMajorRef, saveMajor, saveC
         a.id === id ? { ...a, mysteryCreature: creature } : a,
       ));
     },
-    [saveMajor],
+    [saveMajor, arcanaMajorRef],
   );
 
   const handleOpenMajorModal = useCallback(() => setMajorModalOpen(true), []);

@@ -228,7 +228,7 @@ export const RepeaterField = (props: RepeaterFieldProps) => {
     } else {
       await (onSaveRef.current as PlainProps['onSave'])(values as string[]);
     }
-  }, [toValues]);
+  }, [toValues, onSaveRef]);
 
   const { onChange: debouncedChange, flush } = useDebouncedSave(wrappedSave, 1500);
 

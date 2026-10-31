@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ANIMAL_TYPES, TypePicksSection } from '../AnimalType';
+import { TypePicksSection } from '../AnimalType';
+import { ANIMAL_TYPES } from '../AnimalTypeData';
 
 const config = ANIMAL_TYPES[0];
 

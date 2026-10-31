@@ -66,7 +66,7 @@ const TakeNotesField = ({
   const onSaveRef = useLatest(onSave);
   const saveFn = useCallback(
     (v: string) => onSaveRef.current(v).finally(() => { pendingRef.current = false; }),
-    [],
+    [onSaveRef],
   );
   const { onChange: debouncedChange, flush } = useDebouncedSave(saveFn, 1000);
   useFirestoreSync(firestoreValue, setLocal, pendingRef);

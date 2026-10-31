@@ -48,7 +48,7 @@ export const Background = ({ playbookKey, options, level = 0, data, onSave }: Ba
     const next = { ...freeTextRef.current, [key]: value };
     setFreeText(next);
     debouncedFreeText(next);
-  }, [debouncedFreeText]);
+  }, [debouncedFreeText, freeTextRef]);
 
   const handleOptionChange = useCallback((value: string) => {
     const prevOption = selectedOptionRef.current;
@@ -67,7 +67,7 @@ export const Background = ({ playbookKey, options, level = 0, data, onSave }: Ba
         selectedOptionPendingRef.current = false;
         selectedChoicesPendingRef.current = false;
       });
-  }, [setIsCollapsed, setSelectedOption, setSelectedChoices]);
+  }, [setIsCollapsed, setSelectedOption, setSelectedChoices, onSaveRef, selectedChoicesPendingRef, selectedChoicesRef, selectedOptionPendingRef, selectedOptionRef]);
 
   const handleChoicesChange = useCallback((choices: string[]) => {
     saveChoices(choices);
@@ -75,7 +75,7 @@ export const Background = ({ playbookKey, options, level = 0, data, onSave }: Ba
 
   const handleUsesChange = useCallback((optValue: string, count: number) => {
     saveUses({ ...backgroundUsesRef.current, [optValue]: count });
-  }, [saveUses]);
+  }, [saveUses, backgroundUsesRef]);
 
   if (!options) return <PlaybookSection title="Background" />;
 
