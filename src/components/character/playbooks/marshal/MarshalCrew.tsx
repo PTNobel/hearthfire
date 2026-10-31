@@ -16,7 +16,8 @@ import {
   resolvePlaybookFeatures,
   featurePatch,
 } from "@/lib/resolvePlaybookFeatures";
-import { OptionSelect, toCustomSentinel } from "../../sections/OptionSelect";
+import { OptionSelect } from "../../sections/OptionSelect";
+import { toCustomSentinel } from "../../sections/OptionSelectUtils";
 import type { RadioOption } from "@/types";
 import {
   BACKGROUND_FORCED_MOVES,
