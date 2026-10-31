@@ -37,6 +37,16 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Configure Hosting deploy target
+        env:
+          FIREBASE_HOSTING_SITE_ID: ${{ vars.FIREBASE_HOSTING_SITE_ID }}
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -z "$FIREBASE_HOSTING_SITE_ID" ]; then
+            echo "::error::Set the FIREBASE_HOSTING_SITE_ID Actions variable to your new Hosting site ID."
+            exit 1
+          fi
+          npx --yes firebase-tools@15.34.1 target:apply hosting hearthfire "$FIREBASE_HOSTING_SITE_ID" --project "$FIREBASE_PROJECT_ID"
       - name: Deploy Hosting and Firestore rules
         run: npx --yes firebase-tools@15.34.1 deploy --only hosting,firestore:rules --project "$FIREBASE_PROJECT_ID" --non-interactive
         env:
