@@ -155,7 +155,7 @@ This fork restricts all Firestore reads and writes to exactly one game ID. The I
 2. In this repository's GitHub **Settings → Secrets and variables → Actions**, create `HEARTHFIRE_SESSION_ID` (16–128 lowercase letters, digits, hyphens or underscores; ideally `openssl rand -hex 16`).
 3. Set the six `VITE_FIREBASE_*` GitHub Actions secrets described above for **your** Firebase web app, plus `FIREBASE_SERVICE_ACCOUNT` with a service-account JSON key that can deploy Firebase Hosting and Firestore rules.
 4. Merge the patch into `main`. The workflow builds the site and deploys it along with its restricted Firestore rules.
-5. Share the session ID **separately** with your players. Entering it on the home page creates the game on first use and opens it thereafter. Invalid IDs cause a Firestore `permission-denied` error. The app stores the ID in the browser tab's `sessionStorage` and navigates only to `/game`, `/game/gm`, `/game/steading`, and `/game/:playbook`.
+5. Share the session ID **separately** with your players. Entering it on the home page creates the game on first use and opens it thereafter. Invalid IDs cause a Firestore `permission-denied` error. The app remembers the ID in `localStorage` and navigates only to `/game`, `/game/gm`, `/game/steading`, and `/game/:playbook`.
 
 For local deployment, set `HEARTHFIRE_SESSION_ID` in your shell, run `npm run render:rules` and `npm run build`, then:
 
@@ -165,7 +165,9 @@ firebase deploy --only hosting,firestore:rules --project YOUR_FIREBASE_PROJECT_I
 
 Firestore Security Rules cannot read runtime environment variables. The render script substitutes the ID at **deployment time** into `.firebase/firestore.rules`, which is gitignored. The checked-in `firestore.rules` is a deny-all template. The ID must **not** be placed in a `VITE_*` variable (those are bundled into public JavaScript).
 
-**A URL does not grant access.** The game ID is kept in `sessionStorage` for that browser tab, not in routes, the page header, or shared links. Other tabs and devices must enter the ID again. Firestore still receives the ID as the document path, so it remains a bearer credential; treat it as a password. Do not use a short or guessable session name. If you change the ID, the old game data remains at its old Firestore document path and will not be readable under the new ID.
+**A URL does not grant access.** The game ID is kept in `localStorage`, not in routes, the page header, or shared links. Tabs using the same site origin and browser profile share remembered access, which survives browser restarts. The home page offers **Continue game** and **Forget this device**. Forgetting clears remembered access across open tabs; it does not revoke the shared ID or erase Firestore's offline cache. Other devices, profiles, and site origins still need the ID. Existing tab-only sessions migrate automatically without restoring access explicitly forgotten in another tab.
+
+Firestore still receives the ID as the document path, so it remains a bearer credential; treat it as a password. Do not use a short or guessable session name. If you change the ID, the old game data remains at its old Firestore document path and will not be readable under the new ID.
 
 ---
 

@@ -44,7 +44,7 @@ const NotFound = lazy(() =>
  *
  * Route map:
  *   /                        → Home
- *   /game                    → Game (party overview, secret in sessionStorage)
+ *   /game                    → Game (party overview, secret in browser storage)
  *   /game/gm                 → GM Playbook
  *   /game/steading           → Steading Playbook
  *   /game/:playbook          → Character Playbook
