@@ -34,7 +34,7 @@ describe('relationship hover details', () => {
     const graph = buildRelationshipGraph(game, 960, 600);
     const pc = nodeHoverDetails(game, graph, 'marshal');
     expect(pc?.category).toBe('Player character');
-    expect(pc?.connections).toContain('Eira → Ada (Marshal): sibling');
+    expect(pc?.connections).toContain('Eira → Ada (The Marshal): sibling');
     expect(edgeHoverDetails(graph, 'rel-a')?.category).toBe('Ffion → Eira: friend');
   });
 
