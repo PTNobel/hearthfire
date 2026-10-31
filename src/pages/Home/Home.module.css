@@ -78,10 +78,10 @@
 
 .cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: var(--spacing-6);
   width: 100%;
-  max-width: 600px;
+  max-width: 420px;
 }
 
 @media (max-width: 520px) {

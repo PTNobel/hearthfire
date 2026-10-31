@@ -41,3 +41,6 @@ game-*-backup-*.json
 # Source book texts — kept locally for reference (grepped when verifying game prose), not tracked
 docs/Stonetop (Book 1).txt
 docs/The Wider World (Book 2).txt
+
+# Google GitHub Actions generated credential files
+gha-creds-*.json

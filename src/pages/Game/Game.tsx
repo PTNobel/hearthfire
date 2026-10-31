@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import clsx from 'clsx';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { requireSessionGameId } from '@/lib/sessionGame';
 import { PageMeta } from '@/components/app/PageMeta/PageMeta';
 import { useGame } from '@/hooks/useGame';
 import { DEFAULT_GAME_NAME, getPlaybook, PLAYBOOKS } from '@/lib/constants';
@@ -27,7 +28,6 @@ const SCROLL_SPEED = 8;
 
 interface CharacterRowProps {
   character: Character;
-  gameId: string;
   showGrip: boolean;
   isDragging: boolean;
   canMoveUp: boolean;
@@ -40,7 +40,7 @@ interface CharacterRowProps {
   onDragEnd: () => void;
 }
 
-const CharacterRow = memo(({ character, gameId, showGrip, isDragging, canMoveUp, canMoveDown, onRemove, onMove, onDragStart, onDragOver, onDrop, onDragEnd }: CharacterRowProps) => {
+const CharacterRow = memo(({ character, showGrip, isDragging, canMoveUp, canMoveDown, onRemove, onMove, onDragStart, onDragOver, onDrop, onDragEnd }: CharacterRowProps) => {
   const playbookOption = getPlaybook(character.playbook);
   const playbookLabel = `${playbookOption?.label ?? character.playbook} Playbook`;
   const characterName = character.name?.trim();
@@ -93,7 +93,7 @@ const CharacterRow = memo(({ character, gameId, showGrip, isDragging, canMoveUp,
           </span>
         </span>
       )}
-      <Button as={Link} to={`/game/${gameId}/${character.playbook}`} variant="secondary" size="xl" fullWidth className={linkCx}>
+      <Button as={Link} to={`/game/${character.playbook}`} variant="secondary" size="xl" fullWidth className={linkCx}>
         <span className={styles.characterBtnText}>{buttonLabel}</span>
       </Button>
       <Button
@@ -275,7 +275,6 @@ const GameContent = ({
                   <CharacterRow
                     key={character.id}
                     character={character}
-                    gameId={id}
                     showGrip={showGrip}
                     isDragging={draggingId === character.id}
                     canMoveUp={index > 0}
@@ -298,12 +297,12 @@ const GameContent = ({
           <div className={styles.sectionRight}>
             <div className={styles.section}>
               <Heading as="h2" size="label">Stonetop</Heading>
-              <Button as={Link} to={`/game/${id}/steading`} variant="secondary" size="xl" fullWidth>Open Steading Playbook</Button>
+              <Button as={Link} to="/game/steading" variant="secondary" size="xl" fullWidth>Open Steading Playbook</Button>
             </div>
 
             <div className={styles.section}>
               <Heading as="h2" size="label">GM Playbook</Heading>
-              <Button as={Link} to={`/game/${id}/gm`} variant="secondary" size="xl" fullWidth>Open GM Playbook</Button>
+              <Button as={Link} to="/game/gm" variant="secondary" size="xl" fullWidth>Open GM Playbook</Button>
             </div>
 
             <div className={styles.section}>
@@ -318,7 +317,7 @@ const GameContent = ({
 };
 
 export const Game = () => {
-  const { id = '' } = useParams<{ id: string }>();
+  const id = requireSessionGameId();
   const { state } = useLocation();
   const { game, loading, error, updateGameName, addCharacter, removeCharacter, reorderCharacters, replaceGameData } = useGame(id);
   const [showIdModal, setShowIdModal] = useState((state as LocationState | null)?.isNew === true);
@@ -334,7 +333,7 @@ export const Game = () => {
       error={error}
       game={game}
       loadingText="Loading game…"
-      notFoundMessage={`No game with ID "${id}" exists.`}
+      notFoundMessage="Game not found."
     >
       {(g) => (
         <GameContent

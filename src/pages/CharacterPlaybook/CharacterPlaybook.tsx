@@ -2,6 +2,7 @@ import { useRef, useCallback, useMemo, useInsertionEffect, lazy, Suspense } from
 import { useHashTabs } from '@/hooks/useHashTabs';
 import type { ComponentType, ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { requireSessionGameId } from '@/lib/sessionGame';
 import { PageMeta } from '@/components/app/PageMeta/PageMeta';
 import { useGame } from '@/hooks/useGame';
 import { useNotesActions } from '@/hooks/useNotesActions';
@@ -414,7 +415,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
       <PageLayout simple>
         <div className={styles.centered}>
           <Heading as="h2" size="md">Playbook not found</Heading>
-          <Button as={Link} to={`/game/${id}`} variant="secondary">Back to Game</Button>
+          <Button as={Link} to="/game" variant="secondary">Back to Game</Button>
         </div>
       </PageLayout>
     );
@@ -425,13 +426,13 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
       <PageLayout simple>
         <div className={styles.centered}>
           <Heading as="h2" size="md">Character not found</Heading>
-          <Button as={Link} to={`/game/${id}`} variant="secondary">Back to Game</Button>
+          <Button as={Link} to="/game" variant="secondary">Back to Game</Button>
         </div>
       </PageLayout>
     );
   }
 
-  const nav = buildGameNav(g, id, `/game/${id}/${playbook}`);
+  const nav = buildGameNav(g, `/game/${playbook}`);
 
   return (
     <CharacterSheet
@@ -459,12 +460,13 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
 };
 
 export const CharacterPlaybook = () => {
-  const { id = '', playbook = '' } = useParams<{ id: string; playbook: string }>();
+  const { playbook = '' } = useParams<{ playbook: string }>();
+  const id = requireSessionGameId();
   const { game, loading, error, updateCharacterName, updateCharacterData, adjustCharacterStats, logRoll, updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock } = useGame(id);
   const notesActions = useNotesActions({ updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock });
 
   return (
-    <GameGuard loading={loading} error={error} game={game} errorBackTo={`/game/${id}`} errorBackLabel="Back to Game">
+    <GameGuard loading={loading} error={error} game={game} errorBackTo="/game" errorBackLabel="Back to Game">
       {(g) => (
         <CharacterPlaybookContent
           g={g}

@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { gameIdExists } from '@/lib/game';
+import { createGameWithId, gameIdExists } from '@/lib/game';
 import { Home } from '../Home';
+import { getSessionGameId, clearSessionGameId } from '@/lib/sessionGame';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -13,44 +14,50 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 vi.mock('@/lib/game', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/game')>();
-  return {
-    ...actual,
-    createGame: vi.fn().mockResolvedValue('abc123'),
-    gameIdExists: vi.fn(),
-  };
+  return { ...actual, createGameWithId: vi.fn(), gameIdExists: vi.fn() };
 });
 
 const mockGameIdExists = vi.mocked(gameIdExists);
+const mockCreateGame = vi.mocked(createGameWithId);
 
 describe('Home', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    clearSessionGameId();
     mockGameIdExists.mockReset();
+    mockCreateGame.mockReset();
   });
 
-  it('"Create Game" button calls createGame and navigates to /game/:id', async () => {
-    renderWithProviders(<Home />);
-    await userEvent.click(screen.getByRole('button', { name: /create game/i }));
-    expect(mockNavigate).toHaveBeenCalledWith('/game/abc123', { state: { isNew: true } });
-  });
-
-  it('shows "Game found" once the live check resolves, then submitting navigates to /game/:id', async () => {
+  it('opens an existing game when the session ID is valid', async () => {
     mockGameIdExists.mockResolvedValue(true);
     renderWithProviders(<Home />);
-    await userEvent.type(screen.getByLabelText(/game id/i), 'xyz789');
-    expect(await screen.findByText(/game found/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: /join/i })).toBeEnabled());
-    await userEvent.click(screen.getByRole('button', { name: /join/i }));
-    expect(mockGameIdExists).toHaveBeenCalledWith('xyz789');
-    expect(mockNavigate).toHaveBeenCalledWith('/game/xyz789');
+    await userEvent.type(screen.getByLabelText(/session id/i), 'abcdef0123456789');
+    await userEvent.click(screen.getByRole('button', { name: /open game/i }));
+    expect(mockGameIdExists).toHaveBeenCalledWith('abcdef0123456789');
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/game', undefined));
+    expect(getSessionGameId()).toBe('abcdef0123456789');
+    expect(mockCreateGame).not.toHaveBeenCalled();
   });
 
-  it('shows an inline "no game found" hint and keeps the Join button disabled for a non-existent ID', async () => {
+  it('creates the authorized game the first time it is opened', async () => {
     mockGameIdExists.mockResolvedValue(false);
+    mockCreateGame.mockResolvedValue(undefined);
     renderWithProviders(<Home />);
-    await userEvent.type(screen.getByLabelText(/game id/i), 'nope');
-    expect(await screen.findByText(/no game found with that id/i, {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /join/i })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/session id/i), 'abcdef0123456789');
+    await userEvent.click(screen.getByRole('button', { name: /open game/i }));
+    expect(mockCreateGame).toHaveBeenCalledWith('abcdef0123456789');
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/game', { state: { isNew: true } }));
+    expect(getSessionGameId()).toBe('abcdef0123456789');
+  });
+
+  it('displays an error when Firestore rejects an invalid ID', async () => {
+    mockGameIdExists.mockRejectedValue(new Error('permission-denied'));
+    renderWithProviders(<Home />);
+    await userEvent.type(screen.getByLabelText(/session id/i), 'wrong-session-id');
+    await userEvent.click(screen.getByRole('button', { name: /open game/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid session id/i);
+    expect(getSessionGameId()).toBeNull();
+    expect(mockCreateGame).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

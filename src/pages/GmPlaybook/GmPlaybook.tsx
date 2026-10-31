@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { useHashTabs } from '@/hooks/useHashTabs';
-import { useParams } from 'react-router-dom';
+import { requireSessionGameId } from '@/lib/sessionGame';
 import { PageMeta } from '@/components/app/PageMeta/PageMeta';
 import { useGame } from '@/hooks/useGame';
 import { useNotesActions } from '@/hooks/useNotesActions';
@@ -126,7 +126,7 @@ const GmPlaybookContent = ({ g, id, updateContent, updateField, logRoll, notesAc
   ], [g.content, g.iWonder, updateContent, saveIWonder]);
 
   const { activeIndex, handleActiveChange } = useHashTabs(tabs);
-  const nav = buildGameNav(g, id, `/game/${id}/gm`);
+  const nav = buildGameNav(g, '/game/gm');
 
   return (
     <PageLayout title="GM Playbook" gameId={id} nav={nav} diceRoller={{ rollerId: 'gm', rollerName: 'GM', onRoll: logRoll }}>
@@ -155,12 +155,12 @@ const GmPlaybookContent = ({ g, id, updateContent, updateField, logRoll, notesAc
 };
 
 export const GmPlaybook = () => {
-  const { id = '' } = useParams<{ id: string }>();
+  const id = requireSessionGameId();
   const { game, loading, error, updateContent, updateField, logRoll, updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock } = useGame(id);
   const notesActions = useNotesActions({ updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock });
 
   return (
-    <GameGuard loading={loading} error={error} game={game} errorBackTo={`/game/${id}`} errorBackLabel="Back to Game">
+    <GameGuard loading={loading} error={error} game={game} errorBackTo="/game" errorBackLabel="Back to Game">
       {(g) => (
         <GmPlaybookContent
           g={g}

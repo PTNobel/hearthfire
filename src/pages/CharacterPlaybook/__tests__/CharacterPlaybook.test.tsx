@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderRoute } from '@/test/renderWithProviders';
 import { CharacterPlaybook } from '../CharacterPlaybook';
+import { saveSessionGameId, clearSessionGameId } from '@/lib/sessionGame';
 import type { GameSession, LoggedRoll } from '@/types';
 
 const logRoll = vi.fn<(roll: LoggedRoll) => Promise<void>>();
@@ -35,13 +36,15 @@ vi.mock('@/hooks/useGame', () => ({
 }));
 
 beforeEach(() => {
+  clearSessionGameId();
+  saveSessionGameId('game-1');
   logRoll.mockReset();
   logRoll.mockResolvedValue(undefined);
 });
 
 describe('CharacterPlaybook', () => {
   it('renders without crashing given a valid game document', () => {
-    renderRoute(<CharacterPlaybook />, '/game/game-1/heavy', '/game/:id/:playbook');
+    renderRoute(<CharacterPlaybook />, '/game/heavy', '/game/:playbook');
     expect(screen.getByText('Aldric')).toBeInTheDocument();
   });
 
@@ -49,7 +52,7 @@ describe('CharacterPlaybook', () => {
   // to edit the entry in place — which only works if both writes carry the same id.
   it('logs an advantage change under the id of the roll it changed', async () => {
     const user = userEvent.setup();
-    renderRoute(<CharacterPlaybook />, '/game/game-1/heavy', '/game/:id/:playbook');
+    renderRoute(<CharacterPlaybook />, '/game/heavy', '/game/:playbook');
 
     await user.click(screen.getAllByLabelText(/^Roll \+/)[0]);
     expect(logRoll).toHaveBeenCalledTimes(1);
