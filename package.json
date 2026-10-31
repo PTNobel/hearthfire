@@ -22,7 +22,9 @@
     "restore": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/restore.ts",
     "delete-game": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/delete-game.ts",
     "inspect-game": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/inspect-game.ts",
-    "duplicate-game": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/duplicate-game.ts"
+    "duplicate-game": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/duplicate-game.ts",
+    "render:rules": "node scripts/render-firestore-rules.mjs",
+    "test:rules": "node --test scripts/render-firestore-rules.test.mjs"
   },
   "dependencies": {
     "@fontsource/im-fell-english": "^5.2.6",
