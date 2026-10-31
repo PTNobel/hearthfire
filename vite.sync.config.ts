@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from 'vite';
-import base from './vite.base.config';
+import base from './vite.base.config.ts';
 
 // Emulator-only entry point. Production builds use vite.config.ts and main.tsx.
 export default mergeConfig(base, defineConfig({
