@@ -8,6 +8,8 @@ export default mergeConfig(viteConfig, defineConfig({
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     environment: 'jsdom',
     globals: true,
+    // Vitest 5 changed this default; retain the existing test isolation semantics.
+    clearMocks: false,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
   },
