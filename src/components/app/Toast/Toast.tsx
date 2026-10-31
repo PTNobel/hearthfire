@@ -140,8 +140,8 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     timers.current.set(id, setTimeout(() => startExit(id), AUTO_DISMISS_MS));
   }, [startExit]);
 
-    const savedTimers = timers.current;
   useEffect(() => {
+    const savedTimers = timers.current;
     return () => { savedTimers.forEach(clearTimeout); };
   }, []);
 
