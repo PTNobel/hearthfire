@@ -56,4 +56,33 @@ describe('SaveStatus', () => {
     act(() => { api.reportSaveSettled(true); });
     expect(screen.getByText(/Saved · just now/)).toBeInTheDocument();
   });
+
+  it('keeps saving until overlapping writes settle', () => {
+    renderWithProvider();
+    act(() => { api.reportSaveStart(); api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(true); });
+    expect(screen.getByText('Saving…')).toBeInTheDocument();
+    act(() => { api.reportSaveSettled(false); });
+    expect(screen.getByText(/Saved · just now/)).toBeInTheDocument();
+  });
+
+  it('does not claim a first failed save succeeded', () => {
+    renderWithProvider();
+    act(() => { api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(false); });
+    expect(api.status).toBe('idle');
+    expect(api.lastSavedAt).toBeNull();
+  });
+
+  it('keeps the last successful timestamp when a later save fails', () => {
+    renderWithProvider();
+    act(() => { api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(true); });
+    const savedAt = api.lastSavedAt;
+    act(() => { vi.advanceTimersByTime(60_000); });
+    act(() => { api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(false); });
+    expect(api.lastSavedAt).toBe(savedAt);
+    expect(screen.getByText(/Saved · 1m ago/)).toBeInTheDocument();
+  });
 });

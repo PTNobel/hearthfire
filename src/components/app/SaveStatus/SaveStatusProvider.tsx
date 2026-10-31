@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import {
   SaveStatusContext,
+  SaveStatusActionsContext,
   type SaveStatusContextValue,
   type SaveStatusState,
 } from './SaveStatusContext';
@@ -17,8 +18,10 @@ import {
  * success so the indicator never claims "Saved" when a write actually failed.
  */
 export const SaveStatusProvider = ({ children }: { children: ReactNode }) => {
-  const [status, setStatus] = useState<SaveStatusState>('idle');
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [{ status, lastSavedAt }, setState] = useState<{
+    status: SaveStatusState;
+    lastSavedAt: number | null;
+  }>({ status: 'idle', lastSavedAt: null });
   // Count of saves currently in flight across all hook instances.
   const activeRef = useRef(0);
   // Did any save in the current in-flight batch succeed? Drives whether we land
@@ -28,7 +31,7 @@ export const SaveStatusProvider = ({ children }: { children: ReactNode }) => {
   const reportSaveStart = useCallback(() => {
     activeRef.current += 1;
     if (activeRef.current === 1) batchSucceededRef.current = false;
-    setStatus('saving');
+    setState((prev) => prev.status === 'saving' ? prev : { ...prev, status: 'saving' });
   }, []);
 
   const reportSaveSettled = useCallback((succeeded: boolean) => {
@@ -38,16 +41,20 @@ export const SaveStatusProvider = ({ children }: { children: ReactNode }) => {
       if (batchSucceededRef.current) {
         // Date.now is read at settle time, not render time, so the timestamp
         // reflects when the write actually committed.
-        setLastSavedAt(Date.now());
-        setStatus('saved');
+        setState({ status: 'saved', lastSavedAt: Date.now() });
       } else {
         // Whole batch failed — leave the failure to the Toast. Keep showing the
         // last good "Saved · …" if there was one, so the user doesn't lose that
         // reassurance; otherwise fall back to idle (nothing to show).
-        setStatus(lastSavedAt !== null ? 'saved' : 'idle');
+        setState((prev) => ({ ...prev, status: prev.lastSavedAt !== null ? 'saved' : 'idle' }));
       }
     }
-  }, [lastSavedAt]);
+  }, []);
+
+  const actions = useMemo(
+    () => ({ reportSaveStart, reportSaveSettled }),
+    [reportSaveStart, reportSaveSettled],
+  );
 
   const value = useMemo<SaveStatusContextValue>(
     () => ({ status, lastSavedAt, reportSaveStart, reportSaveSettled }),
@@ -55,8 +62,10 @@ export const SaveStatusProvider = ({ children }: { children: ReactNode }) => {
   );
 
   return (
-    <SaveStatusContext.Provider value={value}>
-      {children}
-    </SaveStatusContext.Provider>
+    <SaveStatusActionsContext.Provider value={actions}>
+      <SaveStatusContext.Provider value={value}>
+        {children}
+      </SaveStatusContext.Provider>
+    </SaveStatusActionsContext.Provider>
   );
 };

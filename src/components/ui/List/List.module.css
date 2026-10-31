@@ -10,9 +10,10 @@
 
 .item {
   font-family: var(--font-serif);
-  font-size: var(--text-sm);
+  font-size: var(--text-prose);
   color: var(--text-primary);
-  line-height: 1.45;
+  line-height: var(--leading-prose);
+  overflow-wrap: anywhere;
 }
 
 /* ── Bullet variant (☉ sun symbol) ──────────────────── */

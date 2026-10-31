@@ -21,13 +21,19 @@ export interface SaveStatusContextValue {
 // can report status without importing the UI layer.
 export const SaveStatusContext = createContext<SaveStatusContextValue | null>(null);
 
+export type SaveStatusActions = Pick<SaveStatusContextValue, 'reportSaveStart' | 'reportSaveSettled'>;
+
+// Writers don't need to subscribe to the indicator's changing status or timestamp.
+export const SaveStatusActionsContext = createContext<SaveStatusActions | null>(null);
+export const useSaveStatusActionsOptional = (): SaveStatusActions | null =>
+  useContext(SaveStatusActionsContext);
+
 export const useSaveStatus = (): SaveStatusContextValue => {
   const ctx = useContext(SaveStatusContext);
   if (!ctx) throw new Error('useSaveStatus must be used inside SaveStatusProvider');
   return ctx;
 };
 
-// For the data layer (useGame), which may render outside a SaveStatusProvider
-// in bare renderHook tests — mirrors useToastOptional.
+// The indicator can also render outside a provider.
 export const useSaveStatusOptional = (): SaveStatusContextValue | null =>
   useContext(SaveStatusContext);

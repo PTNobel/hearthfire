@@ -10,6 +10,8 @@ vi.mock('firebase/firestore', () => firestoreMockModule());
 vi.mock('@/components/app/Toast/ToastContext', () => toastModuleMock());
 
 import { useGame } from '../useGame';
+import { SaveStatusProvider } from '@/components/app/SaveStatus/SaveStatusProvider';
+import { useSaveStatus } from '@/components/app/SaveStatus/SaveStatusContext';
 import type { Character, LoggedRoll, NotesLock } from '@/types';
 
 const GAME_PATH = 'games/g1';
@@ -42,6 +44,30 @@ beforeEach(() => { firestoreStore.reset(); addToastSpy.mockClear(); });
 const renderGame = () => renderHook(() => useGame('g1'));
 
 describe('useGame mutations', () => {
+  it('does not rerender game consumers for save-status-only changes', async () => {
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 5, characters: [char('a')] });
+    const onRender = vi.fn();
+    const GameConsumer = () => {
+      useGame('g1');
+      onRender();
+      return null;
+    };
+    const { result } = renderHook(() => useSaveStatus(), {
+      wrapper: ({ children }) => (
+        <SaveStatusProvider>
+          <GameConsumer />
+          {children}
+        </SaveStatusProvider>
+      ),
+    });
+    await act(async () => {});
+    onRender.mockClear();
+    act(() => { result.current.reportSaveStart(); });
+    act(() => { result.current.reportSaveSettled(true); });
+    expect(result.current.status).toBe('saved');
+    expect(onRender).not.toHaveBeenCalled();
+  });
+
   it('loads and parses the seeded game', async () => {
     firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 5, characters: [char('a')] });
     const { result } = renderGame();

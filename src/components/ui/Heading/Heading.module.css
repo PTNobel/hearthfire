@@ -4,6 +4,8 @@
   line-height: 1.2;
   margin: 0;
   font-weight: normal;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .xl {

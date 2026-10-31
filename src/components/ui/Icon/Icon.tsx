@@ -216,7 +216,7 @@ type IconProps = StrokeIconProps | PlaybookIconProps | LogoIconProps;
 
 export const Icon = ({ name, playbookIcon, logoIcon, size = 'medium', ...props }: IconProps) => {
   if (logoIcon) {
-    const { viewBox, paths } = logoIcons[logoIcon];
+    const { viewBox, href } = logoIcons[logoIcon];
     return (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -225,13 +225,13 @@ export const Icon = ({ name, playbookIcon, logoIcon, size = 'medium', ...props }
         aria-hidden="true"
         {...props}
       >
-        {paths}
+        <use href={href} />
       </svg>
     );
   }
 
   if (playbookIcon) {
-    const { viewBox, paths } = playbookIcons[playbookIcon];
+    const { viewBox, href } = playbookIcons[playbookIcon];
     return (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -240,7 +240,7 @@ export const Icon = ({ name, playbookIcon, logoIcon, size = 'medium', ...props }
         aria-hidden="true"
         {...props}
       >
-        {paths}
+        <use href={href} />
       </svg>
     );
   }

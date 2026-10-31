@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLatest } from './useLatest';
 import { doc, onSnapshot, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useSaveStatusOptional } from '@/components/app/SaveStatus/SaveStatusContext';
+import { useSaveStatusActionsOptional } from '@/components/app/SaveStatus/SaveStatusContext';
 import { useToastOptional } from '@/components/app/Toast/ToastContext';
 import { GAMES_COLLECTION, SAVE_ERROR_MESSAGE } from '@/lib/constants';
 import { isBoolean, isNumber, isPlainObject, isRecord } from '@/lib/typeGuards';
@@ -47,7 +47,7 @@ export const useGame = (gameId: string): UseGameResult => {
   // Report every persisted write to the app-wide save-status indicator and the
   // error Toast. Held in refs so wrapping a mutation doesn't add the (per-render)
   // context objects to its dependency array — the callbacks stay stable.
-  const saveStatus = useSaveStatusOptional();
+  const saveStatus = useSaveStatusActionsOptional();
   const saveStatusRef = useLatest(saveStatus);
   const addToast = useToastOptional()?.addToast;
   const addToastRef = useLatest(addToast);

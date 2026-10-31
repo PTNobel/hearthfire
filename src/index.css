@@ -70,6 +70,8 @@
   --text-xs:   0.8125rem;  /* 13px — labels, citations, meta */
   --text-sm:   0.9375rem;  /* 15px — body copy, move text, most content */
   --text-md:   1rem;       /* 16px — UI chrome, collapse headers */
+  --text-prose: 1.0625rem; /* 17px — small-x-height serif reading text */
+  --leading-prose: 1.55;
   --text-lg:   1.25rem;    /* 20px — section headings, descriptions */
   --text-xl:   1.5625rem;  /* 25px — stat inputs */
   --text-2xl:  1.953rem;   /* 31px — large stat boxes */
@@ -187,7 +189,7 @@
   --text-accent: var(--color-gold-700);
   /* Deeper than --text-accent so hover/active still darkens; passes AA on all surfaces. */
   --text-accent-strong: var(--color-gold-800);
-  --text-heading: var(--color-gold-600);
+  --text-heading: var(--color-gold-700);
 
   /* Status-accent tiers: source hues (ember/moss/amber-400) fall below 3:1 on
      light stone surfaces. Darker shades restore AA contrast for text usage. */

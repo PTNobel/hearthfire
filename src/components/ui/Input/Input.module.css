@@ -16,7 +16,8 @@
 .input {
   composes: focusVisible from '../field.module.css';
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
+  line-height: 1.5;
   color: var(--text-primary);
   background-color: var(--surface-raised);
   border: 1px solid var(--border-subtle);

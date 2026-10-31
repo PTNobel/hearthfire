@@ -1,6 +1,7 @@
 .base {
   line-height: 1.6;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Size */
@@ -31,6 +32,11 @@
 
 .serif {
   font-family: var(--font-serif);
+}
+
+/* The decorative serif needs more room than UI labels at the same nominal size. */
+.serif.sm {
+  font-size: var(--text-prose);
 }
 
 /* Color */
@@ -71,6 +77,10 @@
 /* Leading */
 .leadingTight {
   line-height: 1.45;
+}
+
+.serif.leadingTight {
+  line-height: var(--leading-prose);
 }
 
 .leadingNormal {
