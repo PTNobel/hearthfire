@@ -119,7 +119,7 @@ export const useGame = (gameId: string): UseGameResult => {
   const crewLinkPath = (characterId: string, slot: number): PathPart[] => [
     'characters', { id: characterId }, 'data', 'playbookFeatures', 'crewNpcLinks', String(slot),
   ];
-  const setCrewNpcLink = useCallback((characterId: string, slot: number, npcId: string | null) => {
+  const setCrewNpcLink = useCallback(async (characterId: string, slot: number, npcId: string | null): Promise<void> => {
     const character = validateCrewSlot(game, characterId, slot);
     if (npcId !== null) {
       if (![...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])].some((npc) => npc.id === npcId)) {
@@ -134,7 +134,7 @@ export const useGame = (gameId: string): UseGameResult => {
     return edit(path, readPath(raw, path), npcId ?? undefined, 'Link crew member to Steading NPC');
   }, [game, raw, edit]);
 
-  const createCrewNpc = useCallback((characterId: string, slot: number, npc: SteadingNPC): Promise<void> => {
+  const createCrewNpc = useCallback(async (characterId: string, slot: number, npc: SteadingNPC): Promise<void> => {
     validateCrewSlot(game, characterId, slot);
     if (!raw) return Promise.reject(new Error('Load this game before adding an NPC.'));
     if (!npc.id || !npc.name.trim()) return Promise.reject(new Error('Give this NPC a name.'));
