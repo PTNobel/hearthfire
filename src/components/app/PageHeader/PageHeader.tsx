@@ -154,7 +154,7 @@ export const PageHeader = (props: Props) => {
       .catch(() => addToast("Failed to copy game ID.", "error"));
   }, [simple, props, addToast]);
 
-  const copyLabel = copied ? "Copied!" : "Copy game ID";
+  const copyLabel = copied ? "Copied!" : "Copy session ID";
 
   /*
    * Page identity block — only built in full mode, kept as a variable
@@ -162,7 +162,7 @@ export const PageHeader = (props: Props) => {
    */
   let pageIdentity: React.ReactNode = null;
   if (!simple) {
-    const { title, subtitle, icon, gameId, nav, actions } = props as FullProps;
+    const { title, subtitle, icon, nav, actions } = props as FullProps;
     const onSaveTitle = (props as FullProps).onSaveTitle;
     const titleLabel = (props as FullProps).titleLabel;
 
@@ -223,10 +223,7 @@ export const PageHeader = (props: Props) => {
         )}
         <div className={styles.gameId}>
           <Text color="muted" size="xs">
-            Game ID:{" "}
-            <Text as="span" color="accent" size="xs">
-              {gameId}
-            </Text>
+            Private session
           </Text>
           <Tooltip
             text={copyLabel}

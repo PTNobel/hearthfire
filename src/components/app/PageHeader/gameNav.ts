@@ -21,8 +21,8 @@ export interface GameNav {
  * `current` is the route path of the page being rendered; it must match one of
  * the option values for the switcher to reflect the active destination.
  */
-export const buildGameNav = (game: GameSession, id: string, current: string): GameNav => {
-  const base = `/game/${id}`;
+export const buildGameNav = (game: GameSession, current: string): GameNav => {
+  const base = '/game';
 
   const characterOptions = game.characters.map((c) => {
     const playbookLabel = getPlaybook(c.playbook)?.label ?? c.playbook;
