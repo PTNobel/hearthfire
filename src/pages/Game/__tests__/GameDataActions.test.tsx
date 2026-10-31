@@ -3,6 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { addToastSpy, toastModuleMock } from '@/test/toastMock';
 import { firestoreMockModule, firestoreStore } from '@/test/firestoreMock';
+import { GameSyncContext } from '@/components/app/SaveStatus/GameSyncContext';
+import { changeQueue, emptyQueue } from '@/lib/syncStorage';
+import type { GameSync } from '@/lib/gameSync';
 
 vi.mock('@/components/app', () => toastModuleMock());
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
@@ -39,15 +42,20 @@ const fileInput = (container: HTMLElement) =>
 
 let downloads: string[];
 let click: ReturnType<typeof vi.spyOn>;
+let testStore: GameSync | null = null;
 
 const renderActions = (onReplaceGameData = vi.fn().mockResolvedValue(undefined)) => {
   const view = render(
-    <GameDataActions gameId="long-winter" gameName="The Long Winter" onReplaceGameData={onReplaceGameData} />,
+    <GameSyncContext.Provider value={testStore}>
+      <GameDataActions gameId="long-winter" gameName="The Long Winter" onReplaceGameData={onReplaceGameData} />
+    </GameSyncContext.Provider>,
   );
   return { ...view, onReplaceGameData };
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  testStore = null;
+  await changeQueue('long-winter', () => emptyQueue('long-winter'));
   firestoreStore.reset();
   firestoreStore.set(GAME_PATH, gameDoc());
   addToastSpy.mockClear();
@@ -132,6 +140,56 @@ describe('GameDataActions — choosing a file', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(onReplaceGameData).not.toHaveBeenCalled();
+    expect(downloads).toHaveLength(0);
+  });
+});
+
+describe('GameDataActions — backup completeness', () => {
+  const makeStore = (unpersisted = 0): GameSync => ({
+    getSnapshot: () => ({ localWrites: 0 }),
+    getRecovery: () => ({
+      pending: [], sending: undefined, conflict: undefined,
+      unpersisted: Array.from({ length: unpersisted }, (_, i) => ({ id: String(i) })),
+    }),
+  }) as unknown as GameSync;
+
+  it('blocks export when durable drafts are queued in another tab', async () => {
+    testStore = makeStore();
+    await changeQueue('long-winter', (queue) => ({
+      ...queue,
+      pending: [{ id: 'draft', writer: 'elsewhere', generation: 'old', label: 'draft', changes: [], createdAt: 0 }],
+    }));
+    renderActions();
+    await userEvent.click(screen.getByRole('button', { name: /export game data/i }));
+    await waitFor(() => expect(addToastSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Sync or resolve your local changes'),
+      'error',
+    ));
+    expect(downloads).toHaveLength(0);
+  });
+
+  it('blocks export while this tab has a draft not yet saved to IndexedDB', async () => {
+    testStore = makeStore(1);
+    renderActions();
+    await userEvent.click(screen.getByRole('button', { name: /export game data/i }));
+    await waitFor(() => expect(addToastSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Sync or resolve your local changes'),
+      'error',
+    ));
+    expect(downloads).toHaveLength(0);
+  });
+
+  it('refuses backup restore when unsynced drafts would be omitted from its safety copy', async () => {
+    testStore = makeStore(1);
+    const onReplace = vi.fn().mockResolvedValue(undefined);
+    const { container } = renderActions(onReplace);
+    await userEvent.upload(fileInput(container), backupFile(envelopeJson()));
+    await userEvent.click(await screen.findByRole('button', { name: /replace game data/i }));
+    await waitFor(() => expect(addToastSpy).toHaveBeenCalledWith(
+      expect.stringContaining('before importing'),
+      'error',
+    ));
+    expect(onReplace).not.toHaveBeenCalled();
     expect(downloads).toHaveLength(0);
   });
 });

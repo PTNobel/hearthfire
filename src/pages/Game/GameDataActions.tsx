@@ -1,7 +1,10 @@
 import { useCallback, useId, useRef, useState } from 'react';
 import { Button, Tooltip } from '@/components/ui';
 import { useToast } from '@/components/app';
-import { exportGame, readImportFile, type GameExportEnvelope, type ImportSummary } from '@/lib/gameBackup';
+import { exportGame, readImportFile, verifyBackupReady, UnsyncedBackupError, type GameExportEnvelope, type ImportSummary } from '@/lib/gameBackup';
+import { useGameSyncOptional } from '@/components/app/SaveStatus/GameSyncContext';
+import { useSaveStatusOptional } from '@/components/app/SaveStatus/SaveStatusContext';
+import { useLatest } from '@/hooks/useLatest';
 import { ImportGameModal } from './modals/ImportGameModal';
 import styles from './GameDataActions.module.css';
 
@@ -18,6 +21,12 @@ interface PendingImport {
 
 export const GameDataActions = ({ gameId, gameName, onReplaceGameData }: GameDataActionsProps) => {
   const { addToast } = useToast();
+  const store = useGameSyncOptional();
+  const saveStatus = useLatest(useSaveStatusOptional());
+  const checkBackupReady = useCallback(
+    () => verifyBackupReady(gameId, store, saveStatus.current?.pendingEdits ?? 0),
+    [gameId, store, saveStatus],
+  );
   const exportTooltipId = useId();
   const importTooltipId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,14 +36,19 @@ export const GameDataActions = ({ gameId, gameName, onReplaceGameData }: GameDat
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      const filename = await exportGame(gameId);
+      const filename = await exportGame(gameId, undefined, checkBackupReady);
       addToast(`Downloaded ${filename}`, 'success');
-    } catch {
-      addToast("Couldn't export this game — check your connection and try again.", 'error');
+    } catch (error) {
+      addToast(
+        error instanceof UnsyncedBackupError
+          ? error.message
+          : "Couldn't export this game — current server data is unavailable. Check your connection and try again.",
+        'error',
+      );
     } finally {
       setExporting(false);
     }
-  }, [gameId, addToast]);
+  }, [gameId, checkBackupReady, addToast]);
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
@@ -70,9 +84,14 @@ export const GameDataActions = ({ gameId, gameName, onReplaceGameData }: GameDat
     // the player has — an import is a full-document overwrite — so a failure here aborts
     // the import rather than proceeding without a net.
     try {
-      await exportGame(gameId, 'before-import');
-    } catch {
-      addToast("Couldn't save a backup of the current data, so the import was cancelled. Nothing has changed.", 'error');
+      await exportGame(gameId, 'before-import', checkBackupReady);
+    } catch (error) {
+      addToast(
+        error instanceof UnsyncedBackupError
+          ? 'Sync or resolve your local changes before importing. Nothing has changed.'
+          : "Couldn't save a confirmed server backup, so the import was cancelled. Nothing has changed.",
+        'error',
+      );
       return;
     }
 
@@ -85,7 +104,7 @@ export const GameDataActions = ({ gameId, gameName, onReplaceGameData }: GameDat
 
     setPending(null);
     addToast('Game data restored from backup.', 'success');
-  }, [pending, gameId, onReplaceGameData, addToast]);
+  }, [pending, gameId, checkBackupReady, onReplaceGameData, addToast]);
 
   return (
     <>

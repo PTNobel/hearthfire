@@ -78,8 +78,12 @@ export const useOptimisticField = <T, A extends unknown[] = []>(
       .catch((error) => {
         // Preserve failed work. Rolling back to another optimistic value can
         // present an earlier failed edit as if it had been confirmed.
-        if (revision === revisionRef.current) failedRef.current = !durable;
-        addToastRef.current(errorMsgRef.current, 'error');
+        if (revision === revisionRef.current) {
+          failedRef.current = !durable;
+          addToastRef.current(errorMsgRef.current, 'error');
+        }
+        // Preserve the rejection contract for anyone explicitly awaiting
+        // this particular call, even when its UI notification is obsolete.
         throw error;
       })
       .finally(() => {

@@ -142,6 +142,7 @@ const GameContent = ({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [moveAnnouncement, setMoveAnnouncement] = useState('');
   const draggingIdRef = useRef<string | null>(null);
+  const didDropRef = useRef(false);
   const orderedCharactersRef = useRef<Character[]>(g.characters);
 
   useEffect(() => {
@@ -165,6 +166,7 @@ const GameContent = ({
 
   const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     draggingIdRef.current = id;
+    didDropRef.current = false;
     setDraggingId(id);
     e.dataTransfer.effectAllowed = 'move';
   }, []);
@@ -193,13 +195,25 @@ const GameContent = ({
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    // Dragend fires even if the user cancels or drops outside the roster.
+    // Only a drop on a character row should persist the preview order.
+    if (draggingIdRef.current) didDropRef.current = true;
   }, []);
 
   const handleDragEnd = useCallback(() => {
+    const dropped = didDropRef.current;
     draggingIdRef.current = null;
+    didDropRef.current = false;
     setDraggingId(null);
+    if (!dropped) {
+      // Cancelled drags must restore the current shared order, which may have
+      // changed remotely during the drag.
+      orderedCharactersRef.current = g.characters;
+      setOrderedCharacters(g.characters);
+      return;
+    }
     onReorderCharacters(orderedCharactersRef.current).catch(() => {});
-  }, [onReorderCharacters]);
+  }, [g.characters, onReorderCharacters]);
 
   // Keyboard-accessible reordering: move a character one slot up (-1) or down (1).
   const handleMoveCharacter = useCallback((id: string, direction: -1 | 1) => {

@@ -51,12 +51,18 @@ export const useDebouncedSave = <T>(
     try { attempt = onSaveRef.current(value); }
     catch (error) { attempt = Promise.reject(error); }
     return Promise.resolve(attempt).then(() => {
-      if (current === revision.current) failed.current = false;
-      onSuccessRef.current?.(value);
+      if (current === revision.current) {
+        failed.current = false;
+        onSuccessRef.current?.(value);
+      }
     }, (error) => {
-      if (current === revision.current) failed.current = !durable;
-      if (onErrorRef.current) onErrorRef.current(error);
-      else toastRef.current?.addToast(SAVE_ERROR_MESSAGE, 'error');
+      // An earlier value was superseded by a later local acceptance.
+      // Do not show a stale error for a field whose latest edit succeeded.
+      if (current === revision.current) {
+        failed.current = !durable;
+        if (onErrorRef.current) onErrorRef.current(error);
+        else toastRef.current?.addToast(SAVE_ERROR_MESSAGE, 'error');
+      }
     }).finally(() => {
       pendingCount.current--;
       if (pendingCount.current === 0 && !failed.current) pending(false);

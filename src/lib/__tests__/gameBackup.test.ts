@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { firestoreMockModule, firestoreStore } from '@/test/firestoreMock';
+import { getDocFromServer } from 'firebase/firestore';
+import { changeQueue, emptyQueue } from '@/lib/syncStorage';
+import type { GameSync } from '@/lib/gameSync';
 
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
 vi.mock('firebase/firestore', () => firestoreMockModule());
@@ -25,6 +28,8 @@ import {
   exportGame,
   readImportFile,
   readRawGame,
+  verifyBackupReady,
+  UnsyncedBackupError,
 } from '../gameBackup';
 
 const EXPORTED_AT = new Date('2026-08-17T14:30:00.000Z');
@@ -118,10 +123,48 @@ describe('readRawGame', () => {
     firestoreStore.set('games/long-winter', raw);
 
     await expect(readRawGame('long-winter')).resolves.toEqual(raw);
+    expect(getDocFromServer).toHaveBeenCalled();
+  });
+
+  it('rejects a cache-only or unacknowledged read', async () => {
+    const raw = gameDoc();
+    vi.mocked(getDocFromServer).mockResolvedValueOnce({
+      exists: () => true,
+      data: () => raw,
+      metadata: { fromCache: true, hasPendingWrites: false },
+    } as never);
+    await expect(readRawGame('long-winter')).rejects.toThrow('confirmed server snapshot');
   });
 
   it('throws when the game does not exist', async () => {
     await expect(readRawGame('missing')).rejects.toThrow('Game not found');
+  });
+});
+
+describe('verifyBackupReady', () => {
+  const store = (): GameSync => ({
+    getSnapshot: () => ({ localWrites: 0 }),
+    getRecovery: () => ({ pending: [], sending: undefined, conflict: undefined, unpersisted: [] }),
+  }) as unknown as GameSync;
+
+  it('rejects a queued draft saved by another tab', async () => {
+    const id = 'backup-queued';
+    await changeQueue(id, (queue) => ({
+      ...queue,
+      pending: [{ id: 'other', writer: 'other-tab', generation: 'g', label: 'Change', changes: [], createdAt: 0 }],
+    }));
+    await expect(verifyBackupReady(id, store())).rejects.toBeInstanceOf(UnsyncedBackupError);
+    await changeQueue(id, () => emptyQueue(id));
+  });
+
+  it('accepts a game with no local drafts', async () => {
+    const id = 'backup-clean';
+    await changeQueue(id, () => emptyQueue(id));
+    await expect(verifyBackupReady(id, store())).resolves.toBeUndefined();
+  });
+
+  it('rejects an open unsaved form even when the durable queue is empty', async () => {
+    await expect(verifyBackupReady('backup-clean', store(), 1)).rejects.toBeInstanceOf(UnsyncedBackupError);
   });
 });
 
@@ -178,6 +221,16 @@ describe('exportGame', () => {
 
     await expect(exportGame('long-winter', 'before-import'))
       .resolves.toMatch(/^hearthfire-the-long-winter-before-import-\d{4}-\d{2}-\d{2}\.json$/);
+  });
+
+  it('rechecks for local edits after the server read and skips the download if edits appeared', async () => {
+    firestoreStore.set('games/long-winter', gameDoc());
+    let checks = 0;
+    await expect(exportGame('long-winter', undefined, async () => {
+      if (++checks === 2) throw new UnsyncedBackupError();
+    })).rejects.toBeInstanceOf(UnsyncedBackupError);
+    expect(checks).toBe(2);
+    expect(click).not.toHaveBeenCalled();
   });
 
   it('does not download anything when the game is missing', async () => {
