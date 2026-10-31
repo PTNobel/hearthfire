@@ -42,7 +42,7 @@ export const BlessedEarthMother = ({ data, onSave }: BlessedEarthMotherProps) =>
 
   const handleOffering = useCallback((id: string, checked: boolean) => {
     saveOfferings({ ...offeringsRef.current, [id]: checked });
-  }, [saveOfferings]);
+  }, [saveOfferings, offeringsRef]);
 
   return (
     <PlaybookSection title="The Earth Mother">

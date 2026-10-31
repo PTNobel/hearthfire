@@ -38,7 +38,7 @@ export const useCrewSave = (data: CharacterData | undefined, onSave: (data: Part
         .catch((err: unknown) => { onError?.(err); })
         .finally(clearPending);
     }, 1000);
-  }, [clearPending]);
+  }, [clearPending, dataRef, onSaveRef]);
 
   const saveImmediate = useCallback((patch: Patch) => {
     if (debounceRef.current) {
@@ -47,7 +47,7 @@ export const useCrewSave = (data: CharacterData | undefined, onSave: (data: Part
     }
     pendingRef.current = true;
     return onSaveRef.current(featurePatch(dataRef.current, patch)).finally(clearPending);
-  }, [clearPending]);
+  }, [clearPending, dataRef, onSaveRef]);
 
   // Only writes if a debounce is actually pending — if the timer already fired,
   // this is a no-op rather than a redundant duplicate write.
@@ -57,7 +57,7 @@ export const useCrewSave = (data: CharacterData | undefined, onSave: (data: Part
     debounceRef.current = null;
     pendingRef.current = true;
     return onSaveRef.current(featurePatch(dataRef.current, patch)).finally(clearPending);
-  }, [clearPending]);
+  }, [clearPending, dataRef, onSaveRef]);
 
   return { saveDebounced, saveImmediate, flushDebounce, dataRef, onSaveRef, pendingRef, resolvedTick };
 };

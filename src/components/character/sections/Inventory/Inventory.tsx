@@ -28,11 +28,11 @@ export const Inventory = ({ data, prosperity, onSave }: InventoryProps) => {
 
   const handleMainChecked = useCallback((id: string, val: boolean) => {
     saveInventoryChecked({ ...inventoryCheckedRef.current, [id]: val });
-  }, [saveInventoryChecked]);
+  }, [saveInventoryChecked, inventoryCheckedRef]);
 
   const handleMainUses = useCallback((id: string, n: number) => {
     saveInventoryUses({ ...inventoryUsesRef.current, [id]: n });
-  }, [saveInventoryUses]);
+  }, [saveInventoryUses, inventoryUsesRef]);
 
   const handleUndefinedMain = useCallback((n: number) => {
     saveUndefinedMain(n);
@@ -44,7 +44,7 @@ export const Inventory = ({ data, prosperity, onSave }: InventoryProps) => {
 
   const handleSmallChecked = useCallback((id: string, val: boolean) => {
     saveSmallChecked({ ...smallCheckedRef.current, [id]: val });
-  }, [saveSmallChecked]);
+  }, [saveSmallChecked, smallCheckedRef]);
 
   const handleSavePossessions = useCallback(async (items: { checked: boolean; text: string; weight: 1 | 2 }[]) => {
     await onSaveRef.current({ inventoryPossessions: items });
@@ -56,11 +56,11 @@ export const Inventory = ({ data, prosperity, onSave }: InventoryProps) => {
 
   const handleArcanaCarried = useCallback((id: string, carried: boolean) => {
     saveArcanaMinor(arcanaMinorRef.current.map((e) => e.id === id ? { ...e, carried } : e));
-  }, [saveArcanaMinor]);
+  }, [saveArcanaMinor, arcanaMinorRef]);
 
   const handleArcanaMajorCarried = useCallback((id: string, carried: boolean) => {
     saveArcanaMajor(arcanaMajorRef.current.map((e) => e.id === id ? { ...e, carried } : e));
-  }, [saveArcanaMajor]);
+  }, [saveArcanaMajor, arcanaMajorRef]);
 
   // Arcana weights load lazily (see useArcanaWeights); null means the carried-arcana weights
   // aren't in yet, so the load total stays pending rather than showing a value missing them.

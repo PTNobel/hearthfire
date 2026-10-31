@@ -40,11 +40,11 @@ export const useInsertSections = (
     const next = { ...purposeNamesRef.current, [purposeValue]: e.target.value };
     setPurposeNames(next);
     saveDebounced({ [keysRef.current.purposeName]: next });
-  }, [saveDebounced, setPurposeNames]);
+  }, [saveDebounced, setPurposeNames, keysRef, purposeNamesRef]);
 
   const handlePurposeNameBlur = useCallback(() => {
     flushDebounce({ [keysRef.current.purposeName]: purposeNamesRef.current });
-  }, [flushDebounce]);
+  }, [flushDebounce, keysRef, purposeNamesRef]);
 
   return {
     instinct,

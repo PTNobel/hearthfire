@@ -47,11 +47,11 @@ export const BlessedSacredPouch = ({ data, onSave }: BlessedSacredPouchProps) =>
   const handleIs = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const key = e.currentTarget.dataset.key!;
     saveIs({ ...isRef.current, [key]: e.currentTarget.value });
-  }, [saveIs]);
+  }, [saveIs, isRef]);
 
   const handleTrait = useCallback((id: string, checked: boolean) => {
     saveTraits({ ...traitsRef.current, [id]: checked });
-  }, [saveTraits]);
+  }, [saveTraits, traitsRef]);
 
   return (
     <PlaybookSection title="Sacred Pouch">

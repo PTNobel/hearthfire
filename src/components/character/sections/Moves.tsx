@@ -98,24 +98,24 @@ export const Moves = ({ playbook, data, onSave, level }: MovesProps) => {
       if (lockReasons.length > 0) return;
     }
     saveSelected({ ...selectedRef.current, [id]: value });
-  }, [saveSelected]);
+  }, [saveSelected, effectiveSelectedRef, forcedMoveIdsRef, levelRef, selectedRef, typeMovesRef]);
 
   const handleUses = useCallback((id: string, count: number) => {
     saveUses({ ...usesRef.current, [id]: count });
-  }, [saveUses]);
+  }, [saveUses, usesRef]);
 
   const handleUses2 = useCallback((id: string, count: number) => {
     saveUses2({ ...uses2Ref.current, [id]: count });
-  }, [saveUses2]);
+  }, [saveUses2, uses2Ref]);
 
   const handleTakes = useCallback((id: string, count: number) => {
     saveTakes({ ...takesRef.current, [id]: count });
-  }, [saveTakes]);
+  }, [saveTakes, takesRef]);
 
   const handleCheckList = useCallback((id: string, itemId: string, checked: boolean) => {
     const prev = checkListsRef.current;
     saveCheckLists({ ...prev, [id]: { ...prev[id], [itemId]: checked } });
-  }, [saveCheckLists]);
+  }, [saveCheckLists, checkListsRef]);
 
   const handleCheckListLevel = useCallback((id: string, itemId: string, lvl: number | null) => {
     const prev = checkListLevelsRef.current;
@@ -123,7 +123,7 @@ export const Moves = ({ playbook, data, onSave, level }: MovesProps) => {
     const { [itemId]: _removed, ...rest } = prevItem;
     const nextItem = lvl !== null ? { ...prevItem, [itemId]: lvl } : rest;
     saveCheckListLevels({ ...prev, [id]: nextItem });
-  }, [saveCheckListLevels]);
+  }, [saveCheckListLevels, checkListLevelsRef]);
 
   const playbookEntry = getPlaybook(playbook);
   const playbookLabel = playbookEntry?.label ?? playbook;
@@ -151,7 +151,7 @@ export const Moves = ({ playbook, data, onSave, level }: MovesProps) => {
       }
     }
     return { select, usesMap, uses2Map, takesMap, checkListMap, checkListLevelMap, takeNoteSaveMap };
-  }, [typeMoves, handleSelect, handleUses, handleUses2, handleTakes, handleCheckList, handleCheckListLevel]);
+  }, [typeMoves, handleSelect, handleUses, handleUses2, handleTakes, handleCheckList, handleCheckListLevel, onSaveRef]);
 
   const sortedTypeMoves = useMemo(() => {
     const withMeta = typeMoves.map((move) => {

@@ -11,7 +11,7 @@ vi.mock('@/lib/arcana/major', () => ({
   ],
 }));
 
-import { withMarks } from '../MajorArcanaPanel';
+import { withMarks } from '../withMarks';
 
 const entryFor = (id: string, overrides: Partial<ArcanaMajorEntry> = {}): ArcanaMajorEntry => ({
   id,

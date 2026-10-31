@@ -77,7 +77,7 @@ export const useGame = (gameId: string): UseGameResult => {
     } finally {
       saveStatusRef.current?.reportSaveSettled(succeeded);
     }
-  }, []);
+  }, [addToastRef, saveStatusRef]);
 
   useEffect(() => {
     const ref = gameRef;

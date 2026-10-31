@@ -45,7 +45,7 @@ const CurrencyField = ({ label, fieldKey, savedValue, onSave }: CurrencyFieldPro
       const parsed = parseInt(raw, 10);
       if (!isNaN(parsed) && parsed >= 0) onSaveRef.current(fieldKey, parsed);
     }, 600);
-  }, [fieldKey]);
+  }, [fieldKey, onSaveRef]);
 
   const handleFocus = useCallback(() => { isFocusedRef.current = true; }, []);
 
@@ -56,7 +56,7 @@ const CurrencyField = ({ label, fieldKey, savedValue, onSave }: CurrencyFieldPro
     const clamped = isNaN(parsed) || parsed < 0 ? 0 : parsed;
     setLocal(String(clamped));
     onSaveRef.current(fieldKey, clamped);
-  }, [local, fieldKey]);
+  }, [local, fieldKey, onSaveRef]);
 
   return (
     <div className={styles.denomination}>

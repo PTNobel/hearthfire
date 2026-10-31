@@ -190,11 +190,11 @@ export const Stats = ({ data, onSave, hpMax, damage = 'd6', scoreInstruction = D
         hasAutoInitialized.current = false;
       });
     }
-  }, [data, hpMax]);
+  }, [data, hpMax, onSaveRef]);
 
   const savePayload = useCallback(
     (payload: Partial<CharacterData>) => onSaveRef.current?.(payload) ?? Promise.resolve(),
-    [],
+    [onSaveRef],
   );
 
   // Once a field's value is persisted, drop it from the dirty set so it goes
@@ -211,7 +211,7 @@ export const Stats = ({ data, onSave, hpMax, damage = 'd6', scoreInstruction = D
         dirtyRef.current.delete(k);
       }
     }
-  }, []);
+  }, [debilitiesRef, statsRef]);
 
   const { onChange: debouncedSave, flush, isPendingRef } = useDebouncedSave(
     savePayload,
@@ -237,19 +237,19 @@ export const Stats = ({ data, onSave, hpMax, damage = 'd6', scoreInstruction = D
     setStats(next);
     dirtyRef.current.add(key);
     debouncedSave(pickDirty(next, debilitiesRef.current));
-  }, [debouncedSave, pickDirty]);
+  }, [debouncedSave, pickDirty, debilitiesRef, statsRef]);
 
   const handleFlush = useCallback(() => {
     if (dirtyRef.current.size === 0) return;
     flush(pickDirty(statsRef.current, debilitiesRef.current));
-  }, [flush, pickDirty]);
+  }, [flush, pickDirty, debilitiesRef, statsRef]);
 
   const handleDebilityChange = useCallback((key: keyof DebilitiesState, checked: boolean) => {
     const next = { ...debilitiesRef.current, [key]: checked };
     setDebilities(next);
     dirtyRef.current.add(key);
     flush(pickDirty(statsRef.current, next));
-  }, [flush, pickDirty]);
+  }, [flush, pickDirty, debilitiesRef, statsRef]);
 
   if (!data || hpMax === undefined) return <PlaybookSection title="Stats" />;
 
