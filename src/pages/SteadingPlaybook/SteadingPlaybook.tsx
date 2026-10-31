@@ -68,18 +68,18 @@ const buildFilterGroups = (g: GameSession): DropdownGroup<string>[] => {
   const residents = g.steading?.residents ?? [];
   const neighbors = g.steading?.neighbors ?? [];
   const allNpcs: SteadingNPC[] = [...residents, ...neighbors];
-  const referencedIds = new Set(
-    allNpcs.flatMap((n) => (n.relationships ?? []).map((r) => r.targetId).filter(Boolean)),
+  const connectedIds = new Set(
+    allNpcs.flatMap((n) => (n.relationships ?? []).flatMap((r) => r.targetId ? [n.id, r.targetId] : [])),
   );
 
   const pcs = g.characters
-    .filter((c) => referencedIds.has(c.id))
+    .filter((c) => connectedIds.has(c.id))
     .map((c) => ({ value: c.id, label: `${c.name} (${getPlaybook(c.playbook)?.label ?? c.playbook})` }));
   const residentOpts = residents
-    .filter((r) => referencedIds.has(r.id))
+    .filter((r) => connectedIds.has(r.id))
     .map((r) => ({ value: r.id, label: r.name }));
   const neighborOpts = neighbors
-    .filter((n) => referencedIds.has(n.id))
+    .filter((n) => connectedIds.has(n.id))
     .map((n) => ({ value: n.id, label: n.name }));
 
   const groups: DropdownGroup<string>[] = [];

@@ -195,3 +195,38 @@ test('notes can be edited again after the previous hold releases', async ({ page
   await expect.poll(async () => (await stored()).data()?.notes?.['pc-a']).toContain('Next editing session');
   await expect(page.getByRole('button', { name: 'Save status: Needs review', exact: true })).not.toBeVisible();
 });
+
+test('NPC relationships appear on both cards and can be filtered from either end', async ({ page }, testInfo) => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const ref = doc(ctx.firestore(), 'games', id);
+    const game = (await getDoc(ref)).data()!;
+    await setDoc(ref, { ...game, steading: {
+      residents: [
+        { id: 'npc-a', name: 'Alda', relationships: [{ id: 'a-b', type: 'mother', targetId: 'npc-b', targetKind: 'neighbor' }] },
+        { id: 'npc-c', name: 'Cora' },
+      ],
+      neighbors: [{ id: 'npc-b', name: 'Bram' }],
+    } });
+  });
+  await page.addInitScript((gameId) => localStorage.setItem('hearthfire:session-game-id', gameId), id);
+  await page.goto('/game/steading#npcs');
+  for (const width of [1280, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const name of ['Alda', 'Bram']) {
+      const card = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `Edit ${name}`, exact: true }) });
+      await expect(card.getByText('Alda → Bram: mother', { exact: true })).toBeVisible();
+      expect(await card.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`relationship-cards-${width}.png`), fullPage: true });
+  }
+  const filter = page.getByRole('combobox', { name: 'Filter NPCs by relationship' });
+  await filter.selectOption('npc-a');
+  await expect(page.getByRole('button', { name: 'Edit Bram', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Alda', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Cora', exact: true })).not.toBeVisible();
+  await filter.selectOption('npc-b');
+  await expect(page.getByRole('button', { name: 'Edit Alda', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Bram', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Cora', exact: true })).not.toBeVisible();
+});
