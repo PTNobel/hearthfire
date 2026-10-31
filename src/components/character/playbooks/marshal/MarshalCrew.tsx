@@ -460,7 +460,7 @@ export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
         addToast("Failed to save.", "error");
       });
     },
-    [saveImmediate, addToast],
+    [saveImmediate, addToast, customItemsRef],
   );
 
   const handleCustomItemText = useCallback(
@@ -473,14 +473,14 @@ export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
         addToast("Failed to save.", "error"),
       );
     },
-    [saveDebounced, addToast],
+    [saveDebounced, addToast, customItemsRef],
   );
 
   const handleCustomItemBlur = useCallback(() => {
     flushDebounce({ crewCustomItems: customItemsRef.current }).catch(() =>
       addToast("Failed to save.", "error"),
     );
-  }, [flushDebounce, addToast]);
+  }, [flushDebounce, addToast, customItemsRef]);
 
   const handleSuppliesUsesChange = useCallback(
     (memberIndex: number, n: number) => {
@@ -501,14 +501,14 @@ export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
         addToast("Failed to save.", "error"),
       );
     },
-    [saveDebounced, addToast],
+    [saveDebounced, addToast, individualsRef],
   );
 
   const handleIndividualBlur = useCallback(() => {
     flushDebounce({ crewIndividuals: individualsRef.current }).catch(() =>
       addToast("Failed to save.", "error"),
     );
-  }, [flushDebounce, addToast]);
+  }, [flushDebounce, addToast, individualsRef]);
 
   const handleCrewInstinctSave = useCallback(
     (value: string, customValue: string) => {
@@ -590,7 +590,7 @@ export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
         addToast("Failed to save.", "error");
       });
     },
-    [addToast],
+    [addToast, dataRef, onSaveRef],
   );
 
   return (

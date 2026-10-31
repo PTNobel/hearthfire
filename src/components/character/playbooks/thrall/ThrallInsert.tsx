@@ -115,7 +115,7 @@ export const ThrallInsert = ({ data, onSave }: ThrallInsertProps) => {
         .catch(() => { setThrallImpulse(prevImpulse); setThrallImpulseCustom(prevCustom); })
         .finally(() => { thrallImpulsePendingRef.current = false; thrallImpulseCustomPendingRef.current = false; });
     },
-    [saveImmediate, setThrallImpulse, setThrallImpulseCustom, thrallImpulsePendingRef, thrallImpulseCustomPendingRef],
+    [saveImmediate, setThrallImpulse, setThrallImpulseCustom, thrallImpulsePendingRef, thrallImpulseCustomPendingRef, thrallImpulseCustomRef, thrallImpulseRef],
   );
 
   const handleFavorChange = useCallback((count: number) => {
@@ -124,12 +124,12 @@ export const ThrallInsert = ({ data, onSave }: ThrallInsertProps) => {
 
   const handleMarkGainedChange = useCallback((id: string, gained: boolean) => {
     saveMarksGained({ ...marksGainedRef.current, [id]: gained });
-  }, [saveMarksGained]);
+  }, [saveMarksGained, marksGainedRef]);
 
   const handleMarkCrossedOffChange = useCallback((id: string) => {
     const prev = marksCrossedOffRef.current;
     saveMarksCrossedOff({ ...prev, [id]: !prev[id] });
-  }, [saveMarksCrossedOff]);
+  }, [saveMarksCrossedOff, marksCrossedOffRef]);
 
   return (
     <div className={styles.root}>

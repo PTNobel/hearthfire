@@ -80,21 +80,21 @@ export const RangerAnimalCompanion = ({ data, onSave }: RangerAnimalCompanionPro
 
   const handleTypePickChange = useCallback((id: string, checked: boolean) => {
     saveTypePicks({ ...typePicksRef.current, [id]: checked });
-  }, [saveTypePicks]);
+  }, [saveTypePicks, typePicksRef]);
 
   const handleTypeCustomChange = useCallback((typeId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const next = { ...typeCustomRef.current, [typeId]: e.target.value };
     setTypeCustom(next);
     saveDebounced({ animalTypeCustom: next }, () => addToast('Failed to save.', 'error'));
-  }, [saveDebounced, setTypeCustom, addToast]);
+  }, [saveDebounced, setTypeCustom, addToast, typeCustomRef]);
 
   const handleTypeCustomBlur = useCallback((_typeId: string) => {
     flushDebounce({ animalTypeCustom: typeCustomRef.current }).catch(() => addToast('Failed to save.', 'error'));
-  }, [flushDebounce, addToast]);
+  }, [flushDebounce, addToast, typeCustomRef]);
 
   const handleTypeCustomCheckedChange = useCallback((typeId: string, checked: boolean) => {
     saveTypeCustomChecked({ ...typeCustomCheckedRef.current, [typeId]: checked });
-  }, [saveTypeCustomChecked]);
+  }, [saveTypeCustomChecked, typeCustomCheckedRef]);
 
   const handleLoyaltyChange = useCallback((n: number) => {
     saveLoyalty(n);
@@ -102,7 +102,7 @@ export const RangerAnimalCompanion = ({ data, onSave }: RangerAnimalCompanionPro
 
   const handleBeastOfLegendChange = useCallback((id: string, checked: boolean) => {
     saveBeastOfLegend({ ...beastOfLegendRef.current, [id]: checked });
-  }, [saveBeastOfLegend]);
+  }, [saveBeastOfLegend, beastOfLegendRef]);
 
   const handleInstinctSave = useCallback((value: string, customValue: string) => {
     return onSave(featurePatch(dataRef.current, { animalInstinct: value, animalInstinctCustom: customValue }));
