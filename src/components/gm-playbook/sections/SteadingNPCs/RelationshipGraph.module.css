@@ -55,7 +55,8 @@
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
   text-anchor: middle;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: help;
 }
 
 /* ---- Nodes ----

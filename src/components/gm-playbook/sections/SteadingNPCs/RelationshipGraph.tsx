@@ -430,10 +430,10 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
                 tabIndex={0}
                 role="group"
                 aria-label={`${node.label}, show relationship details`}
+                aria-describedby={hover?.kind === 'node' && hover.id === node.id ? 'relationship-hover-card' : undefined}
                 onFocus={() => setHover({ kind: 'node', id: node.id, x: 8, y: 8 })}
                 onBlur={hideHover}
               >
-                <title>{node.label}</title>
                 <circle r={NODE_RADIUS} className={styles.nodeCircle} />
                 <text x={NODE_RADIUS + 4} y={4} className={styles.nodeLabel}>
                   {truncateLabel(node.label)}
@@ -447,6 +447,7 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
       {details && hover && (
         <div
           role="tooltip"
+          id="relationship-hover-card"
           className={styles.hoverCard}
           style={{ left: hover.x, top: hover.y }}
         >
