@@ -13,6 +13,7 @@ A digital companion for [Stonetop](https://www.kickstarter.com/projects/19561016
 - **GM playbook** — quick-reference material for the Gamemaster
 - **Real-time sync** — Firestore keeps every player's view in sync without a page refresh
 - **No account required** — Firestore enforces the private game ID
+- **Shared map** — open your group's Miro board from any game page
 
 ---
 
@@ -60,6 +61,7 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
+VITE_MIRO_BOARD_URL= # optional: HTTPS link to your shared Miro board
 ```
 
 ### Development
@@ -170,6 +172,14 @@ Firestore Security Rules cannot read runtime environment variables. The render s
 ---
 
 ## Deployment
+
+### Link a shared Miro map
+
+Create a Miro board and choose **Share → Copy board link**. In this repository's [Actions variables](https://github.com/PTNobel/hearthfire/settings/variables/actions), set `VITE_MIRO_BOARD_URL` to the full `https://miro.com/app/board/...` URL (or a Miro welcome link).
+
+After the next deployment, **Map** appears in the top bar of all game pages, opening the board in a new tab. If the variable is absent, the Map link stays hidden. For local development, you can set the same variable in `.env`. No Miro SDK, map editor, Firebase Storage, or additional Firebase permissions are required.
+
+**Privacy:** Vite embeds this URL into public frontend JavaScript, even though the link is only shown inside game pages. Treat it as public. Restrict board access in Miro rather than relying on the link being secret. On Miro's Free plan, public visitors have view-only access; edit access can instead be granted to team members.
 
 ### Choose your Hosting URL
 
