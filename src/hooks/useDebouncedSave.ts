@@ -106,7 +106,7 @@ export const useDebouncedSave = <T>(
     });
     chainRef.current = run;
     return run;
-  }, [setPending, addToast]);
+  }, [setPending, addToast, onErrorRef, onSaveRef, onSuccessRef]);
   // Mirror the latest `save` into a ref so the retry timer can call it without a
   // circular useCallback dependency. Written in an insertion effect (not during
   // render) to satisfy react-hooks/refs; the retry timer only fires post-commit.
