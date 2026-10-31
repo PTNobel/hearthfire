@@ -190,6 +190,7 @@ interface IndividualSlotProps {
   index: number;
   name: string;
   linkedName?: string;
+  linkedTraits?: string;
   npcControls?: React.ReactNode;
   tag: string;
   traits: string;
@@ -202,7 +203,7 @@ interface IndividualSlotProps {
 }
 
 const IndividualSlot = memo(
-  ({ index, name, linkedName, npcControls, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
+  ({ index, name, linkedName, linkedTraits, npcControls, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
     const handleName = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) =>
         onChange(index, "name", e.target.value),
@@ -246,12 +247,14 @@ const IndividualSlot = memo(
         <Input
           multiline
           className={styles.individualTraits}
-          value={traits}
+          value={linkedTraits ?? traits}
+          readOnly={linkedTraits !== undefined}
           placeholder="Traits"
           aria-label={`Individual ${index + 1} traits`}
+          title={linkedTraits !== undefined ? 'Edit traits through the linked Steading NPC' : undefined}
           rows={2}
           onChange={handleTraits}
-          onBlur={onBlur}
+          onBlur={linkedTraits !== undefined ? undefined : onBlur}
         />
         {npcControls}
       </div>
@@ -395,7 +398,10 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, onLinkNpc, onCreat
     : npcModal?.mode === 'create'
       ? {
           name: individuals[npcModal.slot]?.name ?? '',
-          pronouns: '', occupation: 'Soldier', traits: [], relationships: [], notes: '',
+          pronouns: '', occupation: 'Soldier',
+          traits: individuals[npcModal.slot]?.traits.trim()
+            ? [individuals[npcModal.slot].traits.trim()] : [],
+          relationships: [], notes: '',
         }
       : undefined;
 
@@ -869,6 +875,8 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, onLinkNpc, onCreat
               index={i}
               name={ind.name}
               linkedName={npcById.get(npcLinks[String(i)] ?? '')?.name}
+              linkedTraits={npcById.get(npcLinks[String(i)] ?? '')
+                ? (npcById.get(npcLinks[String(i)] ?? '')?.traits ?? []).join(', ') : undefined}
               tag={ind.tag}
               traits={ind.traits}
               onChange={handleIndividualChange}
