@@ -57,7 +57,7 @@ const RangerSomethingWicked = lazy(() => import('@/components/character/playbook
 const RangerAnimalCompanion = lazy(() => import('@/components/character/playbooks/ranger').then((m) => ({ default: m.RangerAnimalCompanion })));
 const SeekerCollection = lazy(() => import('@/components/character/playbooks/seeker').then((m) => ({ default: m.SeekerCollection })));
 const WouldBeHeroFearAnger = lazy(() => import('@/components/character/playbooks/would-be-hero').then((m) => ({ default: m.WouldBeHeroFearAnger })));
-import type { Character, CharacterData, GameSession, LoggedRoll, NotesLock, PlaybookType, PlaybookFeatures } from '@/types';
+import type { Character, CharacterData, GameSession, LoggedRoll, NotesLock, PlaybookType, PlaybookFeatures, SteadingNPC } from '@/types';
 import type { RollReport } from '@/components/character/Move/RollAffordance';
 import { CharacterRollContext } from '@/components/character/Move/CharacterRollContext';
 import styles from './CharacterPlaybook.module.css';
@@ -159,6 +159,7 @@ const PCPlaybookTab = ({
 };
 
 interface SheetProps {
+  game: GameSession;
   character: Character;
   playbookOption: (typeof PLAYBOOKS)[number];
   id: string;
@@ -168,16 +169,26 @@ interface SheetProps {
   updateCharacterName: (characterId: string, name: string) => Promise<void>;
   updateCharacterData: (characterId: string, data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   adjustCharacterStats: (characterId: string, deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
+  setCrewNpcLink: ReturnType<typeof useGame>['setCrewNpcLink'];
+  createCrewNpc: ReturnType<typeof useGame>['createCrewNpc'];
+  updateCrewNpc: ReturnType<typeof useGame>['updateCrewNpc'];
   logRoll: (roll: LoggedRoll) => Promise<void>;
   notesHtml: string | undefined;
   notesLock: NotesLock | undefined;
   notesActions: NotesActions;
 }
 
+interface CrewNpcActions {
+  game: GameSession;
+  onLinkNpc: (slot: number, npcId: string | null) => Promise<void>;
+  onCreateNpc: (slot: number, npc: SteadingNPC) => Promise<void>;
+  onEditNpc: ReturnType<typeof useGame>['updateCrewNpc'];
+}
+
 type PlaybookTabConfig = {
   id: string;
   label: string;
-  render: (data: CharacterData | undefined, onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>, prosperity: number) => ReactNode;
+  render: (data: CharacterData | undefined, onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>, prosperity: number, crew: CrewNpcActions) => ReactNode;
   when?: (data: CharacterData | undefined) => boolean;
 };
 
@@ -188,7 +199,17 @@ const lazyTab = (node: ReactNode): ReactNode => (
 const PLAYBOOK_TAB_CONFIGS: Partial<Record<PlaybookType, PlaybookTabConfig[]>> = {
   lightbearer: [{ id: 'invocations', label: 'Invocations', render: (data, onSave) => lazyTab(<LightbearerInvocations data={data} onSave={onSave} />) }],
   ranger: [{ id: 'animal-companion', label: 'Animal Companion', render: (data, onSave) => lazyTab(<RangerAnimalCompanion data={data} onSave={onSave} />) }],
-  marshal: [{ id: 'crew', label: 'Crew', render: (data, onSave, prosperity) => lazyTab(<MarshalCrew data={data} prosperity={prosperity} onSave={onSave} />) }],
+  marshal: [{ id: 'crew', label: 'Crew', render: (data, onSave, prosperity, crew) => lazyTab(
+    <MarshalCrew
+      data={data}
+      prosperity={prosperity}
+      onSave={onSave}
+      game={crew.game}
+      onLinkNpc={crew.onLinkNpc}
+      onCreateNpc={crew.onCreateNpc}
+      onEditNpc={crew.onEditNpc}
+    />,
+  ) }],
   blessed: [{ id: 'initiates-of-danu', label: 'Initiates of Danu', render: (data, onSave) => lazyTab(<BlessedInitiatesOfDanu data={data} onSave={onSave} />), when: (data) => data?.background === 'initiate' }],
 };
 
@@ -196,7 +217,11 @@ const getPlaybookTabs = (playbook: PlaybookType, data: CharacterData | undefined
   (PLAYBOOK_TAB_CONFIGS[playbook] ?? []).filter(({ when }) => !when || when(data));
 
 
-const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, nav, updateCharacterName, updateCharacterData, adjustCharacterStats, logRoll, notesHtml, notesLock, notesActions }: SheetProps) => {
+const CharacterSheet = ({
+  game, character, playbookOption, id, gameName, prosperity, nav,
+  updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink,
+  createCrewNpc, updateCrewNpc, logRoll, notesHtml, notesLock, notesActions,
+}: SheetProps) => {
   const headerRef = useRef<HTMLDivElement>(null);
 
   // Turn a move roll into a shared-log entry stamped with this character's identity and the current time,
@@ -247,6 +272,21 @@ const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, n
     (name: string) => updateCharacterName(character.id, name),
     [updateCharacterName, character.id]
   );
+
+  const handleCrewNpcLink = useCallback(
+    (slot: number, npcId: string | null) => setCrewNpcLink(character.id, slot, npcId),
+    [setCrewNpcLink, character.id],
+  );
+  const handleCrewNpcCreate = useCallback(
+    (slot: number, npc: SteadingNPC) => createCrewNpc(character.id, slot, npc),
+    [createCrewNpc, character.id],
+  );
+  const crewNpcActions = useMemo<CrewNpcActions>(() => ({
+    game,
+    onLinkNpc: handleCrewNpcLink,
+    onCreateNpc: handleCrewNpcCreate,
+    onEditNpc: updateCrewNpc,
+  }), [game, handleCrewNpcLink, handleCrewNpcCreate, updateCrewNpc]);
 
   const { data: characterData, playbook } = character;
 
@@ -309,9 +349,9 @@ const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, n
       badgeTooltip: tabId === 'invocations' && showInvocationsBadge
         ? 'A new Invocation can be selected'
         : undefined,
-      content: render(characterData, handleSaveCharacterData, prosperity),
+      content: render(characterData, handleSaveCharacterData, prosperity, crewNpcActions),
     })),
-  ], [character.id, characterData, playbook, level, playbookOption, handleSaveCharacterData, handleAdjustCharacterStats, insertInstinctNote, playbookTabs, showInvocationsBadge, prosperity]);
+  ], [character.id, characterData, playbook, level, playbookOption, handleSaveCharacterData, handleAdjustCharacterStats, insertInstinctNote, playbookTabs, showInvocationsBadge, prosperity, crewNpcActions]);
 
   const {
     addTabOpen,
@@ -406,13 +446,16 @@ const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, n
   );
 };
 
-const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, updateCharacterData, adjustCharacterStats, logRoll, notesActions }: {
+const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink, createCrewNpc, updateCrewNpc, logRoll, notesActions }: {
   g: GameSession;
   id: string;
   playbook: PlaybookType;
   updateCharacterName: (characterId: string, name: string) => Promise<void>;
   updateCharacterData: (characterId: string, data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   adjustCharacterStats: (characterId: string, deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
+  setCrewNpcLink: ReturnType<typeof useGame>['setCrewNpcLink'];
+  createCrewNpc: ReturnType<typeof useGame>['createCrewNpc'];
+  updateCrewNpc: ReturnType<typeof useGame>['updateCrewNpc'];
   logRoll: (roll: LoggedRoll) => Promise<void>;
   notesActions: NotesActions;
 }) => {
@@ -453,6 +496,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
       // it back under the new character (see #294).
       key={character.id}
       character={character}
+      game={g}
       playbookOption={playbookOption}
       id={id}
       gameName={g.name || DEFAULT_GAME_NAME}
@@ -461,6 +505,9 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
       updateCharacterName={updateCharacterName}
       updateCharacterData={updateCharacterData}
       adjustCharacterStats={adjustCharacterStats}
+      setCrewNpcLink={setCrewNpcLink}
+      createCrewNpc={createCrewNpc}
+      updateCrewNpc={updateCrewNpc}
       logRoll={logRoll}
       notesHtml={g.notes?.[character.id]}
       notesLock={g.notesLocks?.[character.id]}
@@ -472,7 +519,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
 export const CharacterPlaybook = () => {
   const { playbook = '' } = useParams<{ playbook: string }>();
   const id = requireSessionGameId();
-  const { game, loading, error, updateCharacterName, updateCharacterData, adjustCharacterStats, logRoll, updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock } = useGame(id);
+  const { game, loading, error, updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink, createCrewNpc, updateCrewNpc, logRoll, updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock } = useGame(id);
   const notesActions = useNotesActions({ updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock });
 
   return (
@@ -485,6 +532,9 @@ export const CharacterPlaybook = () => {
           updateCharacterName={updateCharacterName}
           updateCharacterData={updateCharacterData}
           adjustCharacterStats={adjustCharacterStats}
+          setCrewNpcLink={setCrewNpcLink}
+          createCrewNpc={createCrewNpc}
+          updateCrewNpc={updateCrewNpc}
           logRoll={logRoll}
           notesActions={notesActions}
         />
