@@ -1,10 +1,12 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useMemo, memo } from "react";
 import { useLatest } from "@/hooks/useLatest";
 import { useFirestoreSync } from "@/hooks/useFirestoreSync";
 import { usePlaybookField } from "@/hooks/usePlaybookField";
 import {
   Checkbox,
   CheckboxGroup,
+  Button,
+  Dropdown,
   Divider,
   Input,
   Text,
@@ -18,7 +20,11 @@ import {
 } from "@/lib/resolvePlaybookFeatures";
 import { OptionSelect } from "../../sections/OptionSelect";
 import { toCustomSentinel } from "../../sections/OptionSelectUtils";
-import type { RadioOption } from "@/types";
+import type { RadioOption, GameSession, SteadingNPC, SteadingNpcForm } from "@/types";
+import type { DropdownGroup } from "@/components/ui";
+import { NpcModal } from '@/components/gm-playbook/sections/SteadingNPCs/NpcModal';
+import { buildGroups } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
+import type { NpcFormState } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
 import {
   BACKGROUND_FORCED_MOVES,
   BACKGROUND_GRANTED_CREW_TAGS,
@@ -183,6 +189,8 @@ const InventoryRow = memo(
 interface IndividualSlotProps {
   index: number;
   name: string;
+  linkedName?: string;
+  npcControls?: React.ReactNode;
   tag: string;
   traits: string;
   onChange: (
@@ -194,7 +202,7 @@ interface IndividualSlotProps {
 }
 
 const IndividualSlot = memo(
-  ({ index, name, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
+  ({ index, name, linkedName, npcControls, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
     const handleName = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) =>
         onChange(index, "name", e.target.value),
@@ -217,11 +225,13 @@ const IndividualSlot = memo(
           <Input
             className={styles.individualInput}
             type="text"
-            value={name}
+            value={linkedName ?? name}
+            readOnly={linkedName !== undefined}
             placeholder="Name"
             aria-label={`Individual ${index + 1} name`}
+            title={linkedName !== undefined ? 'Edit the name through the linked Steading NPC' : undefined}
             onChange={handleName}
-            onBlur={onBlur}
+            onBlur={linkedName !== undefined ? undefined : onBlur}
           />
           <Input
             className={styles.individualInput}
@@ -243,6 +253,7 @@ const IndividualSlot = memo(
           onChange={handleTraits}
           onBlur={onBlur}
         />
+        {npcControls}
       </div>
     );
   },
@@ -293,9 +304,13 @@ const parseIndividuals = (raw: unknown): Individual[] => {
 
 interface MarshalCrewProps extends PlaybookSectionProps {
   prosperity: number;
+  game: GameSession;
+  onLinkNpc: (slot: number, id: string | null) => Promise<void>;
+  onCreateNpc: (slot: number, npc: SteadingNPC) => Promise<void>;
+  onEditNpc: (npcId: string, original: SteadingNpcForm, next: SteadingNpcForm) => Promise<void>;
 }
 
-export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
+export const MarshalCrew = ({ data, prosperity, onSave, game, onLinkNpc, onCreateNpc, onEditNpc }: MarshalCrewProps) => {
   const { addToast } = useToast();
   const features = resolvePlaybookFeatures(data);
 
