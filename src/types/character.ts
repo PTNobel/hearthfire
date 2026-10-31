@@ -54,6 +54,10 @@ export interface CrewFeatures {
   crewCustomItems?: { checked: boolean; text: string }[];
   crewSuppliesUses?: number[];
   crewIndividuals?: { name: string; tag: string; traits: string }[];
+  // Optional stable Steading NPC links for the six fixed crew slots.
+  // Keys are slot indices 0..5; linked NPC names/relationships live on the
+  // Steading record, not in a second mutable copy on the Crew sheet.
+  crewNpcLinks?: Record<string, string>;
 }
 
 /** The Ranger's something wicked (ranger playbook) */

@@ -55,7 +55,8 @@
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
   text-anchor: middle;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: help;
 }
 
 /* ---- Nodes ----
@@ -108,4 +109,73 @@
 
 .dead .nodeLabel {
   fill: var(--text-tertiary);
+}
+
+/* The hidden hit line makes thin edges easy to hover without changing visuals. */
+.edgeHit {
+  stroke: transparent;
+  stroke-width: 15;
+  pointer-events: stroke;
+}
+
+.edgeEmphasis .edgeLine {
+  stroke: var(--text-accent);
+  stroke-width: 3;
+}
+
+.nodeEmphasis .nodeCircle {
+  stroke: var(--text-accent);
+  stroke-width: 3;
+}
+
+.nodeLabel {
+  pointer-events: auto;
+}
+
+.node:focus-visible .nodeCircle {
+  stroke: var(--text-accent);
+  stroke-width: 3;
+}
+
+.hoverCard {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  box-sizing: border-box;
+  max-width: min(290px, calc(100% - 16px));
+  max-height: min(260px, 70%);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  padding: var(--spacing-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 16%);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.hoverTitle {
+  font-weight: 700;
+}
+
+.hoverCategory {
+  color: var(--text-secondary);
+}
+
+.hoverFacts {
+  padding-left: var(--spacing-4);
+  margin: var(--spacing-2) 0;
+}
+
+.hoverConnections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  padding-top: var(--spacing-2);
+  border-top: 1px solid var(--border-subtle);
 }

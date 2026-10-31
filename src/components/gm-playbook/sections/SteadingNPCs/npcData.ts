@@ -1,6 +1,6 @@
 import type { DropdownGroup } from '@/components/ui';
 import { getPlaybook } from '@/lib/constants';
-import type { NpcRelationship, GameSession } from '@/types';
+import type { NpcRelationship, GameSession, SteadingNpcForm } from '@/types';
 
 export const NPC_TRAITS = [
   'all thumbs', 'ambitious', 'beloved by everyone', 'beautiful singing voice', 'best cook',
@@ -41,14 +41,7 @@ export const decodeTarget = (value: RelTarget): { targetId: string; targetKind: 
   };
 };
 
-export interface NpcFormState {
-  name: string;
-  pronouns: string;
-  occupation: string;
-  traits: string[];
-  relationships: NpcRelationship[];
-  notes: string;
-}
+export type NpcFormState = SteadingNpcForm;
 
 export const EMPTY_FORM: NpcFormState = {
   name: '',

@@ -1,10 +1,12 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, useMemo, memo } from "react";
 import { useLatest } from "@/hooks/useLatest";
 import { useFirestoreSync } from "@/hooks/useFirestoreSync";
 import { usePlaybookField } from "@/hooks/usePlaybookField";
 import {
   Checkbox,
   CheckboxGroup,
+  Button,
+  Dropdown,
   Divider,
   Input,
   Text,
@@ -18,7 +20,11 @@ import {
 } from "@/lib/resolvePlaybookFeatures";
 import { OptionSelect } from "../../sections/OptionSelect";
 import { toCustomSentinel } from "../../sections/OptionSelectUtils";
-import type { RadioOption } from "@/types";
+import type { RadioOption, GameSession, SteadingNPC, SteadingNpcForm } from "@/types";
+import type { DropdownGroup } from "@/components/ui";
+import { NpcModal } from '@/components/gm-playbook/sections/SteadingNPCs/NpcModal';
+import { buildGroups } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
+import type { NpcFormState } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
 import {
   BACKGROUND_FORCED_MOVES,
   BACKGROUND_GRANTED_CREW_TAGS,
@@ -183,6 +189,9 @@ const InventoryRow = memo(
 interface IndividualSlotProps {
   index: number;
   name: string;
+  linkedName?: string;
+  linkedTraits?: string;
+  npcControls?: React.ReactNode;
   tag: string;
   traits: string;
   onChange: (
@@ -194,7 +203,7 @@ interface IndividualSlotProps {
 }
 
 const IndividualSlot = memo(
-  ({ index, name, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
+  ({ index, name, linkedName, linkedTraits, npcControls, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
     const handleName = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) =>
         onChange(index, "name", e.target.value),
@@ -217,11 +226,13 @@ const IndividualSlot = memo(
           <Input
             className={styles.individualInput}
             type="text"
-            value={name}
+            value={linkedName ?? name}
+            readOnly={linkedName !== undefined}
             placeholder="Name"
             aria-label={`Individual ${index + 1} name`}
+            title={linkedName !== undefined ? 'Edit the name through the linked Steading NPC' : undefined}
             onChange={handleName}
-            onBlur={onBlur}
+            onBlur={linkedName !== undefined ? undefined : onBlur}
           />
           <Input
             className={styles.individualInput}
@@ -236,13 +247,16 @@ const IndividualSlot = memo(
         <Input
           multiline
           className={styles.individualTraits}
-          value={traits}
+          value={linkedTraits ?? traits}
+          readOnly={linkedTraits !== undefined}
           placeholder="Traits"
           aria-label={`Individual ${index + 1} traits`}
+          title={linkedTraits !== undefined ? 'Edit traits through the linked Steading NPC' : undefined}
           rows={2}
           onChange={handleTraits}
-          onBlur={onBlur}
+          onBlur={linkedTraits !== undefined ? undefined : onBlur}
         />
+        {npcControls}
       </div>
     );
   },
@@ -293,9 +307,14 @@ const parseIndividuals = (raw: unknown): Individual[] => {
 
 interface MarshalCrewProps extends PlaybookSectionProps {
   prosperity: number;
+  game: GameSession;
+  characterId: string;
+  onLinkNpc: (slot: number, id: string | null) => Promise<void>;
+  onCreateNpc: (slot: number, npc: SteadingNPC) => Promise<void>;
+  onEditNpc: (npcId: string, original: SteadingNpcForm, next: SteadingNpcForm) => Promise<void>;
 }
 
-export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
+export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLinkNpc, onCreateNpc, onEditNpc }: MarshalCrewProps) => {
   const { addToast } = useToast();
   const features = resolvePlaybookFeatures(data);
 
@@ -333,6 +352,79 @@ export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
 
   const customItemsRef = useLatest(customItems);
   const individualsRef = useLatest(individuals);
+
+  const npcLinks = features.crewNpcLinks ?? {};
+  const [npcModal, setNpcModal] = useState<{ slot: number; mode: 'create' | 'edit' } | null>(null);
+  const [linkBusy, setLinkBusy] = useState<number | null>(null);
+  const npcById = useMemo(() => new Map(
+    [...(game.steading?.residents ?? []), ...(game.steading?.neighbors ?? [])]
+      .map((npc) => [npc.id, npc] as const),
+  ), [game.steading?.residents, game.steading?.neighbors]);
+  const linkedIds = new Set(
+    Object.values(npcLinks).filter((id): id is string => typeof id === 'string' && id.length > 0),
+  );
+  const npcGroups: DropdownGroup<string>[] = [
+    {
+      label: 'Stonetop Residents',
+      options: (game.steading?.residents ?? [])
+        .filter((npc) => !linkedIds.has(npc.id))
+        .map((npc) => ({ value: npc.id, label: npc.name })),
+    },
+    {
+      label: 'Notable Neighbors',
+      options: (game.steading?.neighbors ?? [])
+        .filter((npc) => !linkedIds.has(npc.id))
+        .map((npc) => ({ value: npc.id, label: npc.name })),
+    },
+  ].filter((group) => group.options.length > 0);
+
+  const relationshipGroups = useMemo(
+    () => buildGroups(game),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [game.characters, game.steading?.residents, game.steading?.neighbors],
+  );
+  const modalNpcId = npcModal ? npcLinks[String(npcModal.slot)] : undefined;
+  const modalNpc = modalNpcId ? npcById.get(modalNpcId) : undefined;
+  const modalGroups = modalNpc ? relationshipGroups
+    .map((group) => ({
+      ...group, options: group.options.filter((opt) => !opt.value.endsWith(`::${modalNpc.id}`)),
+    })).filter((group) => group.options.length > 0)
+    : relationshipGroups;
+  const modalInitial: NpcFormState | undefined = npcModal?.mode === 'edit' && modalNpc
+    ? {
+        name: modalNpc.name, pronouns: modalNpc.pronouns ?? '',
+        occupation: modalNpc.occupation ?? '', traits: modalNpc.traits ?? [],
+        relationships: modalNpc.relationships ?? [], notes: modalNpc.notes ?? '',
+      }
+    : npcModal?.mode === 'create'
+      ? {
+          name: individuals[npcModal.slot]?.name ?? '',
+          pronouns: '', occupation: 'Soldier',
+          traits: individuals[npcModal.slot]?.traits.trim()
+            ? [individuals[npcModal.slot].traits.trim()] : [],
+          relationships: [], notes: '',
+        }
+      : undefined;
+
+  const handleLinkNpc = useCallback((slot: number, id: string | null) => {
+    setLinkBusy(slot);
+    void onLinkNpc(slot, id).catch(() => {
+      addToast('Could not link this crew member. Check save status and retry.', 'error');
+    }).finally(() => setLinkBusy(null));
+  }, [onLinkNpc, addToast]);
+  const handleCreateNpc = useCallback((slot: number) => setNpcModal({ slot, mode: 'create' }), []);
+  const handleEditNpc = useCallback((slot: number) => setNpcModal({ slot, mode: 'edit' }), []);
+  const handleCloseNpc = useCallback(() => setNpcModal(null), []);
+  const handleSaveNpc = useCallback((form: NpcFormState, original: NpcFormState, id: string) => {
+    if (!npcModal) return Promise.reject(new Error('NPC form closed.'));
+    if (npcModal.mode === 'create') {
+      // The modal provides one stable ID across retries; creation and link are
+      // accepted as one durable batch, with no partly-created records.
+      return onCreateNpc(npcModal.slot, { id, ...form });
+    }
+    if (!modalNpc) return Promise.reject(new Error('Linked NPC no longer exists.'));
+    return onEditNpc(modalNpc.id, original, form);
+  }, [npcModal, modalNpc, onCreateNpc, onEditNpc]);
 
   const { saveDebounced, saveImmediate, flushDebounce, dataRef, onSaveRef, pendingRef } =
     useCrewSave(data, onSave);
@@ -783,14 +875,75 @@ export const MarshalCrew = ({ data, prosperity, onSave }: MarshalCrewProps) => {
               key={`crew-individual-slot-${i}`}
               index={i}
               name={ind.name}
+              linkedName={npcById.get(npcLinks[String(i)] ?? '')?.name}
+              linkedTraits={npcById.get(npcLinks[String(i)] ?? '')
+                ? (npcById.get(npcLinks[String(i)] ?? '')?.traits ?? []).join(', ') : undefined}
               tag={ind.tag}
               traits={ind.traits}
               onChange={handleIndividualChange}
               onBlur={handleIndividualBlur}
+              npcControls={
+                <div className={styles.npcLink}>
+                  {npcLinks[String(i)] ? (
+                    <>
+                      <Text size="xs" color="muted">
+                        {npcById.has(npcLinks[String(i)])
+                          ? 'Linked to Steading NPC; name and relationships are shared.'
+                          : 'Linked NPC was removed. Unlink to choose another.'}
+                      </Text>
+                      <div className={styles.npcLinkActions}>
+                        {npcById.has(npcLinks[String(i)]) && (
+                          <Button variant="secondary" size="sm" disabled={linkBusy !== null}
+                            onClick={() => handleEditNpc(i)}
+                            aria-label={`Edit Steading NPC for individual ${i + 1}`}>
+                            Edit NPC
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" disabled={linkBusy !== null}
+                          onClick={() => handleLinkNpc(i, null)}
+                          aria-label={`Unlink individual ${i + 1} from Steading NPC`}>
+                          Unlink
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {npcGroups.length > 0 && (
+                        <Dropdown
+                          id={`crew-npc-${i}`}
+                          aria-label={`Link individual ${i + 1} to existing NPC`}
+                          value=""
+                          groups={npcGroups}
+                          onChange={(id) => handleLinkNpc(i, id)}
+                          disabled={linkBusy !== null}
+                          placeholder="Link existing NPC…"
+                        />
+                      )}
+                      <Button variant="secondary" size="sm" disabled={linkBusy !== null || !ind.name.trim()}
+                        onClick={() => handleCreateNpc(i)}
+                        aria-label={`Create Steading NPC from individual ${i + 1}`}>
+                        Create NPC
+                      </Button>
+                    </>
+                  )}
+                </div>
+              }
             />
           ))}
         </div>
       </PlaybookSection>
+      {npcModal && modalInitial && (
+        <NpcModal
+          key={`crew-npc-${npcModal.mode}-${npcModal.slot}-${modalNpc?.id ?? ''}`}
+          open
+          onClose={handleCloseNpc}
+          onSave={handleSaveNpc}
+          initial={modalInitial}
+          draftKey={`crew-npc-${characterId}-${npcModal.slot}-${modalNpc?.id ?? 'new'}`}
+          title={npcModal.mode === 'create' ? 'Create Steading NPC from Crew' : 'Edit linked Steading NPC'}
+          relationshipGroups={modalGroups}
+        />
+      )}
     </div>
   );
 };

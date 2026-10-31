@@ -10,6 +10,7 @@ import type { MoveDefinition } from '@/types';
 import { BASIC_MOVES, SPECIAL_MOVES, FOLLOWER_MOVES, EXPEDITION_MOVES, HOMEFRONT_MOVES, BACKGROUND_FORCED_MOVES, BACKGROUND_FORCED_CHECKLIST } from '@/lib/moves';
 import { getLockReason } from '@/lib/moveLockReason';
 import { getPlaybook } from '@/lib/constants';
+import { readSelectedMovesOnly, writeSelectedMovesOnly } from '@/lib/selectedMovesPreference';
 import type { PlaybookType, PlaybookSectionProps } from '@/types';
 import styles from './Moves.module.css';
 
@@ -47,9 +48,10 @@ const MoveSection = ({ label, helperText, moves, emptyText }: MoveSectionProps) 
 interface MovesProps extends PlaybookSectionProps {
   playbook: PlaybookType;
   level: number;
+  characterId: string;
 }
 
-export const Moves = ({ playbook, data, onSave, level }: MovesProps) => {
+export const Moves = ({ playbook, data, onSave, level, characterId }: MovesProps) => {
   const typeMoves = usePlaybookMoves(playbook);
   // Hoisted so the memo deps match what the React Compiler infers (a bare
   // `background`, not `data?.background`), letting it optimize instead of skip.
@@ -72,8 +74,16 @@ export const Moves = ({ playbook, data, onSave, level }: MovesProps) => {
   const { value: checkLists, ref: checkListsRef, save: saveCheckLists } = useCharacterField('typeMoveCheckList', data?.typeMoveCheckList ?? {}, onSave, 'Failed to save checklist.');
   const { value: checkListLevels, ref: checkListLevelsRef, save: saveCheckListLevels } = useCharacterField('typeMoveCheckListLevels', data?.typeMoveCheckListLevels ?? {}, onSave, 'Failed to save checklist.');
 
-  const [isHideUnselected, setIsHideUnselected] = useState(false);
-  const handleHideUnselected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setIsHideUnselected(e.target.checked), []);
+  // Display preference only: it never changes a character's saved move choices.
+  // CharacterSheet remounts by character ID, so each character reads its own preference.
+  const [isHideUnselected, setIsHideUnselected] = useState(
+    () => readSelectedMovesOnly(characterId),
+  );
+  const handleHideUnselected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setIsHideUnselected(checked);
+    writeSelectedMovesOnly(characterId, checked);
+  }, [characterId]);
 
   const onSaveRef = useLatest(onSave);
   const forcedMoveIdsRef = useLatest(forcedMoveIds);

@@ -10,6 +10,7 @@ import {
   reciprocalPairKeys,
 } from './relationshipGraphData';
 import type { GraphNode } from './relationshipGraphData';
+import { edgeHoverDetails, nodeHoverDetails } from './relationshipHoverDetails';
 import styles from './RelationshipGraph.module.css';
 
 // Viewport the simulation lays out into. The SVG scales to its container via a
@@ -86,6 +87,17 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
   // its CTM, so dragging stays accurate at any zoom or pan without extra math.
   const contentRef = useRef<SVGGElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [hover, setHover] = useState<{ kind: 'node' | 'edge'; id: string; x: number; y: number } | null>(null);
+  const showHover = useCallback((kind: 'node' | 'edge', id: string, clientX: number, clientY: number) => {
+    const bounds = svgRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    // Fit the card inside the graph even near the right/bottom edges.
+    const width = Math.min(290, Math.max(100, bounds.width - 16));
+    const x = Math.min(Math.max(8, bounds.width - width - 8), Math.max(8, clientX - bounds.left + 12));
+    const y = Math.min(Math.max(8, bounds.height - 205), Math.max(8, clientY - bounds.top + 12));
+    setHover({ kind, id, x, y });
+  }, []);
+  const hideHover = useCallback(() => setHover(null), []);
   // Per-node position overrides applied on top of the simulated layout once the
   // user drags a node.
   const [overrides, setOverrides] = useState<Record<string, { x: number; y: number }>>({});
@@ -144,6 +156,11 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
   // midpoint, so we offset each off the line to opposite sides to keep both
   // readable.
   const reciprocalPairs = useMemo(() => reciprocalPairKeys(graph.edges), [graph.edges]);
+  const details = hover?.kind === 'node'
+    ? nodeHoverDetails(game, graph, hover.id)
+    : hover?.kind === 'edge'
+      ? edgeHoverDetails(graph, hover.id)
+      : null;
 
   // Fit the viewBox to the simulated layout (graph.nodes), NOT the drag-adjusted
   // positions — otherwise dragging a node to the edge would grow the frame and
@@ -321,7 +338,7 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
         ref={svgRef}
         className={styles.svg}
         viewBox={viewBox}
-        role="img"
+        role="group"
         aria-label={`Relationship map: ${graph.nodes.length} characters, ${graph.edges.length} relationships`}
         onPointerDown={handleBackgroundPointerDown}
         onPointerMove={handleBackgroundPointerMove}
@@ -369,8 +386,16 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
               midY += offY;
             }
             return (
-              <g key={edge.id} className={styles.edge}>
+              <g key={edge.id} className={clsx(styles.edge,
+                hover && (hover.kind === 'edge' ? hover.id === edge.id
+                  : hover.id === edge.sourceId || hover.id === edge.targetId)
+                  && styles.edgeEmphasis,
+                )}
+                onMouseEnter={(event) => showHover('edge', edge.id, event.clientX, event.clientY)}
+                onMouseLeave={hideHover}
+              >
                 <line x1={x1} y1={y1} x2={x2} y2={y2} className={styles.edgeLine} markerEnd="url(#rel-arrow)" />
+                <line x1={x1} y1={y1} x2={x2} y2={y2} className={styles.edgeHit} />
                 {edge.type && (
                   <text x={midX} y={midY} className={styles.edgeLabel} dy="-2">
                     {edge.type}
@@ -388,6 +413,7 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
               styles[node.kind],
               node.dead && styles.dead,
               drag?.id === node.id && styles.dragging,
+              hover?.kind === 'node' && hover.id === node.id && styles.nodeEmphasis,
             );
             return (
               <g
@@ -399,8 +425,15 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
                 onPointerMove={handleNodePointerMove}
                 onPointerUp={handleNodePointerUp}
                 onLostPointerCapture={handleNodePointerUp}
+                onMouseEnter={(event) => showHover('node', node.id, event.clientX, event.clientY)}
+                onMouseLeave={hideHover}
+                tabIndex={0}
+                role="group"
+                aria-label={`${node.label}, show relationship details`}
+                aria-describedby={hover?.kind === 'node' && hover.id === node.id ? 'relationship-hover-card' : undefined}
+                onFocus={() => setHover({ kind: 'node', id: node.id, x: 8, y: 8 })}
+                onBlur={hideHover}
               >
-                <title>{node.label}</title>
                 <circle r={NODE_RADIUS} className={styles.nodeCircle} />
                 <text x={NODE_RADIUS + 4} y={4} className={styles.nodeLabel}>
                   {truncateLabel(node.label)}
@@ -411,6 +444,28 @@ export const RelationshipGraph = ({ game, focusId }: RelationshipGraphProps) => 
         </g>
         </g>
       </svg>
+      {details && hover && (
+        <div
+          role="tooltip"
+          id="relationship-hover-card"
+          className={styles.hoverCard}
+          style={{ left: hover.x, top: hover.y }}
+        >
+          <strong className={styles.hoverTitle}>{details.title}</strong>
+          <span className={styles.hoverCategory}>{details.category}</span>
+          {details.facts.length > 0 && (
+            <ul className={styles.hoverFacts}>
+              {details.facts.map((fact, i) => <li key={`fact-${fact}-${i}`}>{fact}</li>)}
+            </ul>
+          )}
+          {details.connections.length > 0 && (
+            <div className={styles.hoverConnections}>
+              {details.connections.slice(0, 8).map((link, i) => <div key={`connection-${link}-${i}`}>{link}</div>)}
+              {details.connections.length > 8 && <div>+{details.connections.length - 8} more relationships</div>}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.controls}>
         <Button variant="secondary" size="sm" icon="undo" onClick={handleResetNodes} disabled={!hasMovedNodes} aria-label="Reset node positions" />
