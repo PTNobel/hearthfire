@@ -134,10 +134,10 @@ describe('useGame mutations', () => {
     // only knows about 'a' and 'b'.
     await act(async () => {
       firestoreStore.set(GAME_PATH, { name: '', createdAt: 0, characters: [char('a'), char('b'), char('c')] });
-  
-      await act(async () => {
-        await result.current.reorderCharacters([char('b'), char('a')]);
-      });
+    });
+
+    await act(async () => {
+      await result.current.reorderCharacters([char('b'), char('a')]);
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['b', 'a', 'c']);
