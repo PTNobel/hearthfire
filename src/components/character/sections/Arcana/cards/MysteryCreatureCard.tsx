@@ -33,7 +33,7 @@ export const MysteryCreatureCard = memo(
       setCreature(next);
       lastSavedRef.current = JSON.stringify(next);
       onSaveRef.current(next);
-    }, []);
+    }, [onSaveRef]);
 
     const handleFieldChange = useCallback(
       <K extends keyof Creature>(field: K, value: Creature[K]) => {
@@ -45,10 +45,10 @@ export const MysteryCreatureCard = memo(
           setCreature(next);
         }
       },
-      [commit],
+      [commit, creatureRef],
     );
 
-    const handleBlur = useCallback(() => commit(creatureRef.current), [commit]);
+    const handleBlur = useCallback(() => commit(creatureRef.current), [commit, creatureRef]);
 
     return (
       <CreatureCard

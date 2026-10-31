@@ -44,7 +44,7 @@ export const Appearance = ({ rows, data, onSave }: AppearanceProps = {}) => {
     const rowIndex = Number(e.currentTarget.dataset.row);
     const value = e.currentTarget.value;
     saveSelected({ ...selectedRef.current, [String(rowIndex)]: value });
-  }, [saveSelected]);
+  }, [saveSelected, selectedRef]);
 
   const handleCustomToggle = useCallback(() => {
     const prevCustom = customTextRef.current;

@@ -76,7 +76,7 @@ export const MinorArcanaPanel = ({ arcanaMinor, arcanaMinorRef, saveMinor }: Min
       saveMinor([...arcanaMinorRef.current, entry]);
       setMinorModalOpen(false);
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleRandomMinor = useCallback(() => {
@@ -84,13 +84,13 @@ export const MinorArcanaPanel = ({ arcanaMinor, arcanaMinorRef, saveMinor }: Min
     if (available.length === 0) return;
     const pick = available[Math.floor(Math.random() * available.length)];
     handleAddMinor(pick);
-  }, [handleAddMinor]);
+  }, [handleAddMinor, arcanaMinorRef]);
 
   const handleRemoveMinor = useCallback(
     (id: string) => {
       saveMinor(arcanaMinorRef.current.filter((a) => a.id !== id), id);
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleToggleRequirement = useCallback(
@@ -99,21 +99,21 @@ export const MinorArcanaPanel = ({ arcanaMinor, arcanaMinorRef, saveMinor }: Min
         a.id === id ? { ...a, requirementsChecked: { ...a.requirementsChecked, [key]: checked } } : a,
       ));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleMinorMarksChange = useCallback(
     (id: string, value: number) => {
       saveMinor(arcanaMinorRef.current.map((a) => (a.id === id ? { ...a, marksValue: value } : a)));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleMinorTrackerChange = useCallback(
     (id: string, value: number) => {
       saveMinor(arcanaMinorRef.current.map((a) => (a.id === id ? { ...a, trackerValue: value } : a)));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleMinorStatusChange = useCallback(
@@ -122,14 +122,14 @@ export const MinorArcanaPanel = ({ arcanaMinor, arcanaMinorRef, saveMinor }: Min
         a.id === id ? { ...a, statusChecks: { ...a.statusChecks, [statusId]: checked } } : a,
       ));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleMinorNotesChange = useCallback(
     (id: string, value: string) => {
       saveMinor(arcanaMinorRef.current.map((a) => (a.id === id ? { ...a, notes: value } : a)));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleMinorFollowerHpChange = useCallback(
@@ -141,14 +141,14 @@ export const MinorArcanaPanel = ({ arcanaMinor, arcanaMinorRef, saveMinor }: Min
         return { ...a, followerHp };
       }));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleMinorFollowerLoyaltyChange = useCallback(
     (id: string, value: number) => {
       saveMinor(arcanaMinorRef.current.map((a) => (a.id === id ? { ...a, followerLoyalty: value } : a)));
     },
-    [saveMinor],
+    [saveMinor, arcanaMinorRef],
   );
 
   const handleOpenMinorModal = useCallback(() => setMinorModalOpen(true), []);
