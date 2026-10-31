@@ -35,6 +35,7 @@ const mount = (linked = false) => {
       data={crewData(linked)}
       onSave={onSave}
       game={game}
+      characterId="marshal-1"
       prosperity={1}
       onLinkNpc={onLinkNpc}
       onCreateNpc={onCreateNpc}

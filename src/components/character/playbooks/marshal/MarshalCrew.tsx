@@ -308,12 +308,13 @@ const parseIndividuals = (raw: unknown): Individual[] => {
 interface MarshalCrewProps extends PlaybookSectionProps {
   prosperity: number;
   game: GameSession;
+  characterId: string;
   onLinkNpc: (slot: number, id: string | null) => Promise<void>;
   onCreateNpc: (slot: number, npc: SteadingNPC) => Promise<void>;
   onEditNpc: (npcId: string, original: SteadingNpcForm, next: SteadingNpcForm) => Promise<void>;
 }
 
-export const MarshalCrew = ({ data, prosperity, onSave, game, onLinkNpc, onCreateNpc, onEditNpc }: MarshalCrewProps) => {
+export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLinkNpc, onCreateNpc, onEditNpc }: MarshalCrewProps) => {
   const { addToast } = useToast();
   const features = resolvePlaybookFeatures(data);
 
@@ -938,7 +939,7 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, onLinkNpc, onCreat
           onClose={handleCloseNpc}
           onSave={handleSaveNpc}
           initial={modalInitial}
-          draftKey={`crew-npc-${npcModal.slot}-${modalNpc?.id ?? 'new'}`}
+          draftKey={`crew-npc-${characterId}-${npcModal.slot}-${modalNpc?.id ?? 'new'}`}
           title={npcModal.mode === 'create' ? 'Create Steading NPC from Crew' : 'Edit linked Steading NPC'}
           relationshipGroups={modalGroups}
         />

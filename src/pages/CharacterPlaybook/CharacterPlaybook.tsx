@@ -180,6 +180,7 @@ interface SheetProps {
 
 interface CrewNpcActions {
   game: GameSession;
+  characterId: string;
   onLinkNpc: (slot: number, npcId: string | null) => Promise<void>;
   onCreateNpc: (slot: number, npc: SteadingNPC) => Promise<void>;
   onEditNpc: ReturnType<typeof useGame>['updateCrewNpc'];
@@ -205,6 +206,7 @@ const PLAYBOOK_TAB_CONFIGS: Partial<Record<PlaybookType, PlaybookTabConfig[]>> =
       prosperity={prosperity}
       onSave={onSave}
       game={crew.game}
+      characterId={crew.characterId}
       onLinkNpc={crew.onLinkNpc}
       onCreateNpc={crew.onCreateNpc}
       onEditNpc={crew.onEditNpc}
@@ -283,10 +285,11 @@ const CharacterSheet = ({
   );
   const crewNpcActions = useMemo<CrewNpcActions>(() => ({
     game,
+    characterId: character.id,
     onLinkNpc: handleCrewNpcLink,
     onCreateNpc: handleCrewNpcCreate,
     onEditNpc: updateCrewNpc,
-  }), [game, handleCrewNpcLink, handleCrewNpcCreate, updateCrewNpc]);
+  }), [game, character.id, handleCrewNpcLink, handleCrewNpcCreate, updateCrewNpc]);
 
   const { data: characterData, playbook } = character;
 
