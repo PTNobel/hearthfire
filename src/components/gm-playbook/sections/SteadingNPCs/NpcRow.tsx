@@ -4,21 +4,40 @@ import { Button, Text, Tooltip } from '@/components/ui';
 import type { SteadingNPC, NpcRelationship } from '@/types';
 import styles from './NpcRow.module.css';
 
+export interface IncomingRelationship {
+  source: SteadingNPC;
+  relationship: NpcRelationship;
+}
+
 interface NpcRowProps {
   npc: SteadingNPC;
   onEdit: (npc: SteadingNPC) => void;
   onRemove: (id: string) => void;
   onToggleDead: (id: string) => void;
   resolveTarget: (rel: NpcRelationship) => string;
+  incomingRelationships: IncomingRelationship[];
 }
 
-export const NpcRow = ({ npc, onEdit, onRemove, onToggleDead, resolveTarget }: NpcRowProps) => {
+// Keep the original direction visible on either card. Free-form labels such as
+// "mother" or "distrusts" cannot safely be inverted into a reciprocal label.
+const relationshipLabel = (source: string, rel: NpcRelationship, target: string): string =>
+  [rel.targetId ? `${source} → ${target}` : '', rel.type].filter(Boolean).join(': ');
+
+export const NpcRow = ({ npc, onEdit, onRemove, onToggleDead, resolveTarget, incomingRelationships }: NpcRowProps) => {
   const handleEdit = useCallback(() => onEdit(npc), [onEdit, npc]);
   const handleRemove = useCallback(() => onRemove(npc.id), [onRemove, npc.id]);
   const handleToggleDead = useCallback(() => onToggleDead(npc.id), [onToggleDead, npc.id]);
   const rowCx = clsx(styles.npcRow, npc.dead && styles.npcRowDead);
   const nameCx = clsx(npc.dead && styles.npcNameStrike);
   const tombstoneCx = clsx(npc.dead && styles.tombstoneActive);
+  const relationships = [
+    ...(npc.relationships ?? []).map((rel) => ({
+      key: `outgoing:${rel.id}`, label: relationshipLabel(npc.name, rel, resolveTarget(rel)),
+    })),
+    ...incomingRelationships.map(({ source, relationship }) => ({
+      key: `incoming:${source.id}:${relationship.id}`, label: relationshipLabel(source.name, relationship, npc.name),
+    })),
+  ].filter(({ label }) => label);
   return (
     <div className={rowCx} role="listitem">
       <div className={styles.npcInfo}>
@@ -35,12 +54,9 @@ export const NpcRow = ({ npc, onEdit, onRemove, onToggleDead, resolveTarget }: N
             ))}
           </div>
         )}
-        {npc.relationships && npc.relationships.length > 0 && (
+        {relationships.length > 0 && (
           <div className={styles.npcRelTraits}>
-            {npc.relationships.map((rel) => {
-              const label = [rel.type, rel.targetId ? resolveTarget(rel) : ''].filter(Boolean).join(': ');
-              return label ? <span key={rel.id} className={styles.npcRelTrait}>{label}</span> : null;
-            })}
+            {relationships.map(({ key, label }) => <span key={key} className={styles.npcRelTrait}>{label}</span>)}
           </div>
         )}
         {npc.notes && <Text as="span" size="xs" color="muted">{npc.notes}</Text>}

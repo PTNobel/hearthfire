@@ -101,3 +101,82 @@ describe('SteadingNPCs mutations', () => {
     expect(residents[0].name).toBe('Aldara');
   });
 });
+
+describe('SteadingNPCs relationships', () => {
+  const alda = npc('a', { name: 'Alda', relationships: [
+    { id: 'a-b', type: 'mother', targetId: 'b', targetKind: 'resident' },
+  ] });
+  const bram = npc('b', { name: 'Bram' });
+  const card = (name: string) => within(screen.getByRole('button', { name: `Edit ${name}` }).closest('[role="listitem"]') as HTMLElement);
+  const residents = [alda, bram];
+  const linkedGame = { ...game, steading: { residents } };
+
+  it('shows a directed relationship on both cards without writing a reciprocal record', async () => {
+    render(<SteadingNPCs section="residents" npcs={residents} onSave={onSave} game={linkedGame} />);
+
+    expect(card('Alda').getByText('Alda → Bram: mother')).toBeInTheDocument();
+    expect(card('Bram').getByText('Alda → Bram: mother')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Bram' }));
+    const dialog = within(screen.getByRole('dialog'));
+    await userEvent.type(dialog.getByRole('textbox', { name: /^name/i }), 'well');
+    await userEvent.click(dialog.getByRole('button', { name: /save npc/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const saved = residentsFrom(onSave);
+    expect(saved.find((n) => n.id === 'a')?.relationships).toEqual(alda.relationships);
+    expect(saved.find((n) => n.id === 'b')?.relationships).toEqual([]);
+  });
+
+  it('includes incoming links across the residents and neighbors sections', () => {
+    const neighborLink = { ...alda, relationships: [{ ...alda.relationships![0], targetKind: 'neighbor' as const }] };
+    const crossSectionGame = { ...game, steading: { residents: [neighborLink], neighbors: [bram] } };
+    render(<>
+      <SteadingNPCs section="residents" npcs={[neighborLink]} onSave={onSave} game={crossSectionGame} />
+      <SteadingNPCs section="neighbors" npcs={[bram]} onSave={onSave} game={crossSectionGame} />
+    </>);
+    expect(card('Alda').getByText('Alda → Bram: mother')).toBeInTheDocument();
+    expect(card('Bram').getByText('Alda → Bram: mother')).toBeInTheDocument();
+  });
+
+  it('filters connected NPCs in either direction and excludes unrelated NPCs', () => {
+    const npcs = [...residents, npc('c', { name: 'Cora' })];
+    const props = { section: 'residents' as const, npcs, onSave, game: { ...game, steading: { residents: npcs } } };
+    const { rerender } = render(<SteadingNPCs {...props} filterTargetId="a" />);
+    expect(screen.getByRole('button', { name: 'Edit Bram' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Cora' })).not.toBeInTheDocument();
+    rerender(<SteadingNPCs {...props} filterTargetId="b" />);
+    expect(screen.getByRole('button', { name: 'Edit Alda' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Cora' })).not.toBeInTheDocument();
+  });
+
+  it('updates incoming labels after a rename and removes them immediately when the source is deleted', async () => {
+    const { rerender } = render(<SteadingNPCs section="residents" npcs={residents} onSave={onSave} game={linkedGame} />);
+    const renamed = [{ ...alda, name: 'Aldara' }, bram];
+    rerender(<SteadingNPCs section="residents" npcs={renamed} onSave={onSave} game={{ ...game, steading: { residents: renamed } }} />);
+    expect(card('Bram').getByText('Aldara → Bram: mother')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Aldara' }));
+    expect(card('Bram').queryByText(/mother/)).not.toBeInTheDocument();
+  });
+
+  it('keeps reciprocal directions distinct and does not duplicate a self-link', () => {
+    const npcs = [{ ...alda, relationships: [...alda.relationships!,
+      { id: 'self', type: 'self', targetId: 'a', targetKind: 'resident' as const },
+    ] }, { ...bram, relationships: [
+      { id: 'b-a', type: 'child', targetId: 'a', targetKind: 'resident' as const },
+    ] }];
+    render(<SteadingNPCs section="residents" npcs={npcs} onSave={onSave} game={{ ...game, steading: { residents: npcs } }} />);
+    for (const name of ['Alda', 'Bram']) {
+      expect(card(name).getAllByText('Alda → Bram: mother')).toHaveLength(1);
+      expect(card(name).getAllByText('Bram → Alda: child')).toHaveLength(1);
+    }
+    expect(card('Alda').getAllByText('Alda → Alda: self')).toHaveLength(1);
+  });
+
+  it('does not treat a PC link as an incoming link to an NPC with the same id', () => {
+    const source = { ...alda, relationships: [{ ...alda.relationships![0], targetKind: 'pc' as const }] };
+    const npcs = [source, bram];
+    render(<SteadingNPCs section="residents" npcs={npcs} onSave={onSave} game={{ ...game, steading: { residents: npcs } }} />);
+    expect(card('Bram').queryByText(/mother/)).not.toBeInTheDocument();
+  });
+});
