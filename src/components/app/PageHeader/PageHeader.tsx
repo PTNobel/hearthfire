@@ -16,6 +16,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import type { GameNav } from "./gameNav";
 import { SiteBanner } from "@/components/app/SiteBanner/SiteBanner";
 import { SITE_BANNER } from "@/lib/siteBanner";
+import { getConfiguredMiroBoardUrl } from "@/lib/miroBoard";
 import styles from "./PageHeader.module.css";
 
 /*
@@ -69,6 +70,7 @@ type Props = SimpleProps | FullProps;
 
 export const PageHeader = (props: Props) => {
   const { simple } = props;
+  const miroBoardUrl = getConfiguredMiroBoardUrl();
 
   /*
    * All the editing/copy state below is only used in full mode.
@@ -288,8 +290,19 @@ export const PageHeader = (props: Props) => {
           <Heading as="h1" size="md" className={styles.wordmark}>
             <Link to="/" className={styles.wordmarkLink}>Hearthfire</Link>
           </Heading>
-          <div className={styles.statusActions}>
+          <div className={styles.topBarActions}>
             <SaveStatus />
+            {miroBoardUrl && (
+              <a
+                href={miroBoardUrl}
+                className={styles.mapLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open shared map in Miro (new tab)"
+              >
+                Map
+              </a>
+            )}
             <ThemeToggle />
           </div>
         </div>
