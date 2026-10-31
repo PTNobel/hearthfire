@@ -168,11 +168,6 @@
   color: var(--text-accent);
 }
 
-/* ── Hit band ────────────────────────────────────────── */
-.band {
-  font-variant-numeric: tabular-nums;
-}
-
 /* ── Animations (respect reduced-motion) ─────────────── */
 @media (prefers-reduced-motion: no-preference) {
   .result {
@@ -189,11 +184,6 @@
   /* The total pops in once the dice have settled, so the eye lands on it last. */
   .totalSettled {
     animation: popIn 0.22s ease both;
-  }
-
-  /* A brief accent flash on the matched band as it appears. */
-  .band {
-    animation: bandFlash 0.5s ease both;
   }
 
   /* The re-roll icon spins once on press for tactile feedback (icon is the Button's svg child). */
@@ -238,20 +228,6 @@
   to {
     transform: scale(1);
     opacity: 1;
-  }
-}
-
-@keyframes bandFlash {
-  0% {
-    opacity: 0;
-  }
-  30% {
-    opacity: 1;
-    transform: translateX(2px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
   }
 }
 

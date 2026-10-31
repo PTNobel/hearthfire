@@ -169,7 +169,6 @@ export const RollAffordance = ({
     [],
   );
 
-  const hitBand = result && !tumbling ? bandFor(result.total, bands) : null;
   const label = rollLabel(activeStat, activeResource);
   const triggerCx = clsx(styles.trigger, open && styles.rerollIcon);
   const atMin = adjust <= ADJUST_MIN;
@@ -290,11 +289,6 @@ export const RollAffordance = ({
               = {result.total}
             </span>
           </div>
-          {hitBand && (
-            <Text as="span" size="xs" weight="semibold" color="accent" className={styles.band}>
-              ▸ {hitBand.label}
-            </Text>
-          )}
         </div>
       )}
     </div>

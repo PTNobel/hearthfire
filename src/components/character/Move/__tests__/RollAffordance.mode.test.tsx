@@ -38,6 +38,20 @@ describe('RollAffordance advantage / disadvantage', () => {
     expect(screen.getByText('= 11')).toBeInTheDocument(); // 5 + 6, dropping the 2
   });
 
+  it('shows the dice and numeric total without a second outcome-band label', async () => {
+    seedDice([3, 4]);
+    const user = userEvent.setup();
+    const onRoll = vi.fn();
+    render(<RollAffordance stat="WIS" bands={BANDS} mod={0} debilityDisadvantage={false} onRoll={onRoll} />);
+
+    await user.click(screen.getByLabelText('Roll +WIS'));
+    expect(screen.getByText('= 7')).toBeInTheDocument();
+    // Keep the outcome classification for the shared roll log, not the inline UI.
+    expect(onRoll).toHaveBeenCalledWith(expect.objectContaining({ total: 7, band: '7-9' }));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(screen.queryByText('7-9')).not.toBeInTheDocument();
+  });
+
   it('pre-selects disadvantage when the stat carries a marked debility', () => {
     render(<RollAffordance stat="WIS" bands={BANDS} mod={0} debilityDisadvantage />);
     expect(screen.getByRole('button', { name: 'Dis' })).toHaveAttribute('aria-pressed', 'true');

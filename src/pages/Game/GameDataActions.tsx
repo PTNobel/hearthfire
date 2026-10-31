@@ -97,8 +97,17 @@ export const GameDataActions = ({ gameId, gameName, onReplaceGameData }: GameDat
 
     try {
       await onReplaceGameData(pending.envelope.game);
-    } catch {
-      // reportSave in useGame already toasted the specific Firestore failure.
+    } catch (error) {
+      // Durable sync rejections do not automatically emit an error toast.
+      // Keep the confirmation open so the player can retry.
+      const pendingChanges = error instanceof Error
+        && error.message === 'Resolve and sync pending changes before restoring.';
+      addToast(
+        pendingChanges
+          ? 'Sync or resolve pending changes before restoring a backup.'
+          : "Couldn't restore this game. Check save status and try again.",
+        'error',
+      );
       return;
     }
 
