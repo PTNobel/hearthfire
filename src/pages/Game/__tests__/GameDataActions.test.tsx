@@ -194,6 +194,31 @@ describe('GameDataActions — confirming the import', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('explains why an import is blocked by unsynced changes', async () => {
+    const onReplaceGameData = vi.fn().mockRejectedValue(new Error('Resolve and sync pending changes before restoring.'));
+    const { container } = renderActions(onReplaceGameData);
+    await confirmImport(container);
+
+    await waitFor(() => expect(addToastSpy).toHaveBeenCalledWith(
+      'Sync or resolve pending changes before restoring a backup.',
+      'error',
+    ));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(downloads).toHaveLength(1);
+  });
+
+  it('reports unexpected restore failures instead of silently returning', async () => {
+    const onReplaceGameData = vi.fn().mockRejectedValue(new Error('Storage unavailable'));
+    const { container } = renderActions(onReplaceGameData);
+    await confirmImport(container);
+
+    await waitFor(() => expect(addToastSpy).toHaveBeenCalledWith(
+      "Couldn't restore this game. Check save status and try again.",
+      'error',
+    ));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('keeps the dialog open and claims no success when the overwrite fails', async () => {
     const onReplaceGameData = vi.fn().mockRejectedValue(new Error('permission-denied'));
     const { container } = renderActions(onReplaceGameData);
