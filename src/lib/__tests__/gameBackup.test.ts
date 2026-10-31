@@ -141,6 +141,33 @@ describe('readRawGame', () => {
   });
 });
 
+describe('verifyBackupReady', () => {
+  const store = (): GameSync => ({
+    getSnapshot: () => ({ localWrites: 0 }),
+    getRecovery: () => ({ pending: [], sending: undefined, conflict: undefined, unpersisted: [] }),
+  }) as unknown as GameSync;
+
+  it('rejects a queued draft saved by another tab', async () => {
+    const id = 'backup-queued';
+    await changeQueue(id, (queue) => ({
+      ...queue,
+      pending: [{ id: 'other', writer: 'other-tab', generation: 'g', label: 'Change', changes: [], createdAt: 0 }],
+    }));
+    await expect(verifyBackupReady(id, store())).rejects.toBeInstanceOf(UnsyncedBackupError);
+    await changeQueue(id, () => emptyQueue(id));
+  });
+
+  it('accepts a game with no local drafts', async () => {
+    const id = 'backup-clean';
+    await changeQueue(id, () => emptyQueue(id));
+    await expect(verifyBackupReady(id, store())).resolves.toBeUndefined();
+  });
+
+  it('rejects an open unsaved form even when the durable queue is empty', async () => {
+    await expect(verifyBackupReady('backup-clean', store(), 1)).rejects.toBeInstanceOf(UnsyncedBackupError);
+  });
+});
+
 describe('exportGame', () => {
   let createObjectURL: ReturnType<typeof vi.fn>;
   let revokeObjectURL: ReturnType<typeof vi.fn>;
