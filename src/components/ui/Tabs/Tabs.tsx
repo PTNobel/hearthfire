@@ -35,8 +35,6 @@ interface TabsProps {
   onAdd?: () => void;
 }
 
-export const tabBadgeClass = styles.tabBadge;
-
 const portalTarget = typeof document !== "undefined" ? document.body : null;
 
 const PortalTooltip = ({

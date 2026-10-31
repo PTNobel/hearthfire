@@ -5,9 +5,11 @@ import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeat
 import { moveTakeCount } from '@/lib/moveTakeCount';
 import { useCrewSave } from '../shared/useCrewSave';
 import { useTrackedField } from '../shared/useTrackedField';
-import { ANIMAL_TYPES, TypePicksSection } from './AnimalType';
+import { TypePicksSection } from './AnimalType';
+import { ANIMAL_TYPES } from './AnimalTypeData';
 import { AnimalStats } from './AnimalStats';
-import { OptionSelect, toCustomSentinel } from '../../sections/OptionSelect';
+import { OptionSelect } from '../../sections/OptionSelect';
+import { toCustomSentinel } from '../../sections/OptionSelectUtils';
 import { BeastOfLegend } from './BeastOfLegend';
 import { Text } from '@/components/ui';
 import { LoyaltyRow } from '../shared/CrewWidgets';

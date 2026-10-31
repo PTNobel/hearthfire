@@ -10,10 +10,7 @@ import { PlaybookSection } from '@/components/playbook/PlaybookSection';
 import type { RadioOption } from '@/types';
 import styles from './OptionSelect.module.css';
 
-export const CUSTOM_VALUE = '__custom__';
-
-// Older Firestore records stored the literal 'custom' for the Custom… option.
-export const toCustomSentinel = (v: string | undefined) => (v === 'custom' ? CUSTOM_VALUE : (v ?? ''));
+import { CUSTOM_VALUE } from './OptionSelectUtils';
 
 export interface OptionSelectProps {
   // `name` attribute shared by the radios, so they form one group.

@@ -9,7 +9,8 @@ import { ScrollToTop, Tabs, Dropdown, Button, PlaybookColumns } from '@/componen
 import type { DropdownGroup } from '@/components/ui';
 import { PageLayout } from '@/components/app/PageLayout/PageLayout';
 import { buildGameNav } from '@/components/app/PageHeader/gameNav';
-import { SteadingImprovementList, RESOURCES_CONFIG, FORTIFICATIONS_CONFIG } from '@/components/gm-playbook/sections/SteadingImprovementList';
+import { SteadingImprovementList } from '@/components/gm-playbook/sections/SteadingImprovementList';
+import { RESOURCES_CONFIG, FORTIFICATIONS_CONFIG } from '@/components/gm-playbook/sections/SteadingImprovementConfigs';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
 import { GameGuard } from '@/components/app/GameGuard/GameGuard';
 import { DEFAULT_GAME_NAME, getPlaybook } from '@/lib/constants';
