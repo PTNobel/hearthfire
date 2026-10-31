@@ -171,7 +171,13 @@ Firestore Security Rules cannot read runtime environment variables. The render s
 
 ## Deployment
 
-After you configure the secrets above, pushes to `main` deploy Hosting and the generated Firestore rules to your Firebase project.
+### Choose your Hosting URL
+
+In Firebase console, under **Hosting**, create a new site with an available site ID such as `hearthfire-velt`; its URL will be `https://hearthfire-velt.web.app`. This can be an additional Hosting site in your existing Firebase project; you do not need to create a new project or run `firebase init`.
+
+In [repository Actions variables](https://github.com/PTNobel/hearthfire/settings/variables/actions), add `FIREBASE_HOSTING_SITE_ID` with the **exact** site ID you created (not the complete URL and not your Firebase project ID). This is a nonsecret variable. The deploy workflow configures the `hearthfire` target automatically and deploys only to that site, while keeping Firestore in your existing Firebase project.
+
+After configuring the secrets and this variable, pushes to `main` deploy Hosting and the generated Firestore rules to your Firebase project.
 
 ---
 

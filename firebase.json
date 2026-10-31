@@ -3,6 +3,7 @@
     "rules": ".firebase/firestore.rules"
   },
   "hosting": {
+    "target": "hearthfire",
     "public": "dist",
     "ignore": [
       "firebase.json",
