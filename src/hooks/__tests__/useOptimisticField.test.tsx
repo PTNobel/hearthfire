@@ -28,7 +28,7 @@ describe('useOptimisticField', () => {
     let rejectOld: (error: Error) => void = () => {};
     const saveFn = vi.fn().mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectOld = reject; }))
       .mockResolvedValue(undefined);
-    const { result } = renderHook(() => useOptimisticField('initial', saveFn, 'failed'));
+    const { result } = renderHook(() => useOptimisticField<string>('initial', saveFn, 'failed'));
 
     act(() => { void result.current.save('older'); });
     await act(async () => { await result.current.save('newer'); });
