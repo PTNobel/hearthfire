@@ -91,7 +91,18 @@ const INSERT_INSTINCT_KEYS: { feature: keyof PlaybookFeatures; label: string }[]
 ];
 
 
-const PCPlaybookTab = ({ playbook, data, level, playbookOption, onSave, insertInstinctNote }: { playbook: PlaybookType; data: CharacterData | undefined; level: number; playbookOption: (typeof PLAYBOOKS)[number]; onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>; insertInstinctNote: string | undefined }) => {
+const PCPlaybookTab = ({
+  playbook, gameId, characterId, data, level, playbookOption, onSave, insertInstinctNote,
+}: {
+  playbook: PlaybookType;
+  gameId: string;
+  characterId: string;
+  data: CharacterData | undefined;
+  level: number;
+  playbookOption: (typeof PLAYBOOKS)[number];
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
+  insertInstinctNote: string | undefined;
+}) => {
   const foxChooseOverride = playbook === 'fox' && data?.background === FOX_LIFE_OF_CRIME_BACKGROUND
     ? { count: 3, note: '+1 from A Life of Crime' }
     : undefined;
@@ -130,7 +141,7 @@ const PCPlaybookTab = ({ playbook, data, level, playbookOption, onSave, insertIn
           />
         </>}
       />
-      <PlaybookColumns full={<Moves playbook={playbook} data={data} onSave={onSave} level={level} />} />
+      <PlaybookColumns full={<Moves playbook={playbook} gameId={gameId} characterId={characterId} data={data} onSave={onSave} level={level} />} />
       <PlaybookColumns full={<SpecialPossessions config={SPECIAL_POSSESSIONS_OPTIONS[playbook]} data={data} onSave={onSave} level={level} chooseOverride={foxChooseOverride} />} />
       <PlaybookColumns
         left={PLAYBOOK_SECTIONS[playbook] ? (
@@ -276,7 +287,7 @@ const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, n
     {
       id: 'pc-playbook',
       label: 'PC Playbook',
-      content: <PCPlaybookTab playbook={playbook} data={characterData} level={level} playbookOption={playbookOption} onSave={handleSaveCharacterData} insertInstinctNote={insertInstinctNote} />,
+      content: <PCPlaybookTab playbook={playbook} gameId={id} characterId={character.id} data={characterData} level={level} playbookOption={playbookOption} onSave={handleSaveCharacterData} insertInstinctNote={insertInstinctNote} />,
     },
     {
       id: 'inventory',
@@ -301,7 +312,7 @@ const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, n
         : undefined,
       content: render(characterData, handleSaveCharacterData, prosperity),
     })),
-  ], [characterData, playbook, level, playbookOption, handleSaveCharacterData, handleAdjustCharacterStats, insertInstinctNote, playbookTabs, showInvocationsBadge, prosperity]);
+  ], [character.id, id, characterData, playbook, level, playbookOption, handleSaveCharacterData, handleAdjustCharacterStats, insertInstinctNote, playbookTabs, showInvocationsBadge, prosperity]);
 
   const {
     addTabOpen,
