@@ -2,19 +2,13 @@ import { PLAYBOOKS, STAT_ABBRS } from '@/lib/constants';
 import { filterByType, filterNestedRecordByType, filterRecordByType, isBoolean, isNumber, isPlainObject, isRecord, isString } from '@/lib/typeGuards';
 import type { ArcanaMajorEntry, ArcanaMinorEntry, Character, CharacterData, ContentLists, GameSession, GmImprovement, LoggedRoll, NotesLock, NpcRelationship, PlaybookFeatures, RollStat, SteadingData, SteadingNPC } from '@/types';
 
-// Derived from the canonical PLAYBOOKS list, not hand-copied: a character whose
-// playbook isn't recognized gets filtered out of the array we write back (see
-// withCharacters), so a set that drifted behind a newly-added playbook would
-// silently delete every character of that playbook. Sourcing it here keeps them
-// in lockstep.
+// Parse only supported playbooks for display. Mutations operate on raw data
+// and explicit changed paths, so hidden or unrecognized fields remain intact.
 const VALID_PLAYBOOKS = new Set<string>(PLAYBOOKS.map((p) => p.value));
 
 const num = (v: unknown): number | undefined => isNumber(v) ? v : undefined;
 
-// `level` is deliberately not checked here: a character with a non-numeric level is repaired (see
-// parseCharacters), not dropped. `withCharacters` writes the parsed array back, so anything filtered out
-// here is permanently deleted on the next edit — we only filter on fields with no safe default (id, name,
-// an unrenderable playbook).
+// Repair a missing level for display; hide records with no usable identity.
 const isCharacter = (v: unknown): v is Omit<Character, 'level'> & { level?: unknown } =>
   isRecord(v) &&
   isString(v.id) &&

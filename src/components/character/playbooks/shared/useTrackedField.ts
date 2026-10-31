@@ -7,7 +7,7 @@ export const useTrackedField = (
   initialValue: string,
   fieldKey: keyof PlaybookFeatures,
   saveDebounced: (patch: Partial<PlaybookFeatures>, onError?: (err: unknown) => void) => void,
-  flushDebounce: (patch: Partial<PlaybookFeatures>) => Promise<void>,
+  flushDebounce: (patch: Partial<PlaybookFeatures>, base?: Partial<PlaybookFeatures>) => Promise<void>,
   errorMsg = 'Failed to save.',
 ) => {
   const { addToast } = useToast();

@@ -13,7 +13,7 @@ interface InsertSectionKeys {
 
 export const useInsertSections = (
   data: CharacterData | undefined,
-  onSave: (data: Partial<CharacterData>) => Promise<void>,
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>,
   keys: InsertSectionKeys,
 ) => {
   const { saveDebounced, saveImmediate, flushDebounce } = useCrewSave(data, onSave);

@@ -6,7 +6,7 @@ import globals from 'globals';
 
 export default tseslint.config(
   // Ignore build output, deps, and non-app scripts (Firestore admin tooling).
-  { ignores: ['dist', 'coverage', 'node_modules', 'scripts'] },
+  { ignores: ['dist', 'coverage', 'node_modules', 'scripts', 'test-results', 'playwright-report'] },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,

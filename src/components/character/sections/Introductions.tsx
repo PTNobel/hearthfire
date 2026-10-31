@@ -1,7 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useLatest } from '@/hooks/useLatest';
-import { useDebouncedSave } from '@/hooks/useDebouncedSave';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { useCharacterField } from '@/hooks/useCharacterField';
 import { CheckboxGroup, Input, List, Text } from '@/components/ui';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
 import type { CharacterData, IntroductionsConfig } from '@/types';
@@ -10,7 +8,7 @@ import styles from './Introductions.module.css';
 interface IntroductionsProps {
   config?: IntroductionsConfig;
   data?: CharacterData;
-  onSave?: (data: Partial<CharacterData>) => Promise<void>;
+  onSave?: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
 }
 
 interface StepAnswerProps {
@@ -36,50 +34,23 @@ const StepAnswer = ({ stepId, value, onChange, onBlur }: StepAnswerProps) => (
 );
 
 export const Introductions = ({ config, data, onSave }: IntroductionsProps = {}) => {
-  const onSaveRef = useLatest(onSave);
-  const { value: questions, ref: questionsRef, save: saveQuestions } = useOptimisticField(
-    data?.introductionQuestions ?? {},
-    (next) => onSaveRef.current?.({ introductionQuestions: next }) ?? Promise.resolve(),
-    'Failed to save.',
+  const savePatch = useCallback((patch: Partial<CharacterData>, base?: Partial<CharacterData>) =>
+    onSave?.(patch, base) ?? Promise.resolve(), [onSave]);
+  const { value: questions, save: saveQuestions } = useCharacterField(
+    'introductionQuestions', data?.introductionQuestions ?? {}, savePatch, 'Failed to preserve question.',
   );
-
-  // answers tracks the same pendingRef as the debounced save below, so a remote
-  // snapshot echo can't clobber in-progress typing while a write is in flight.
-  const { value: answers, ref: answersRef, setValue: setAnswers, pendingRef: answersPendingRef } = useOptimisticField(
-    data?.introductionAnswers ?? {},
-    (next) => onSaveRef.current?.({ introductionAnswers: next }) ?? Promise.resolve(),
-    'Failed to save.',
+  const { value: answers, save: saveAnswers } = useCharacterField(
+    'introductionAnswers', data?.introductionAnswers ?? {}, savePatch, 'Failed to preserve answer.',
   );
-
-  const saveAnswers = (next: Record<string, string>) =>
-    onSaveRef.current?.({ introductionAnswers: next }) ?? Promise.resolve();
-  // onSuccess fires on a real write AND on a deduped no-op flush, so the pending
-  // flag always clears — otherwise a redundant flush would leave it stuck true
-  // and block every later remote sync of the answers.
-  const { onChange: debouncedSaveAnswers, flush: flushAnswers } = useDebouncedSave(
-    saveAnswers,
-    1000,
-    undefined,
-    () => { answersPendingRef.current = false; },
-  );
-
   const handleQuestion = useCallback((id: string, checked: boolean) => {
-    saveQuestions({ ...questionsRef.current, [id]: checked });
-  }, [saveQuestions, questionsRef]);
-
+    void saveQuestions((current) => ({ ...current, [id]: checked }));
+  }, [saveQuestions]);
   const handleAnswerChange = useCallback((stepId: string, value: string) => {
-    const next = { ...answersRef.current, [stepId]: value };
-    setAnswers(next);
-    answersPendingRef.current = true;
-    debouncedSaveAnswers(next);
-  }, [setAnswers, debouncedSaveAnswers, answersPendingRef, answersRef]);
-
-  const handleAnswerBlur = useCallback((stepId: string, value: string) => {
-    const next = { ...answersRef.current, [stepId]: value };
-    setAnswers(next);
-    answersPendingRef.current = true;
-    flushAnswers(next);
-  }, [setAnswers, flushAnswers, answersPendingRef, answersRef]);
+    void saveAnswers((current) => ({ ...current, [stepId]: value }));
+  }, [saveAnswers]);
+  const handleAnswerBlur = useCallback(() => {
+    window.dispatchEvent(new Event('hearthfire:flush'));
+  }, []);
 
   const items = useMemo(() => {
     if (!config) return [];

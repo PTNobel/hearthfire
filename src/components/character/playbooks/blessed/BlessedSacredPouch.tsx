@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { usePlaybookField } from '@/hooks/usePlaybookField';
+import { useCrewSave } from '../shared/useCrewSave';
 import { CheckboxGroup, Divider, Radio, RadioGroup, Text } from '@/components/ui';
 import { bigMagicCount } from '@/lib/bigMagic';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
-import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
+import { resolvePlaybookFeatures } from '@/lib/resolvePlaybookFeatures';
 import type { PlaybookSectionProps } from '@/types';
 import styles from './BlessedSacredPouch.module.css';
 
@@ -30,16 +31,19 @@ type BlessedSacredPouchProps = PlaybookSectionProps;
 
 export const BlessedSacredPouch = ({ data, onSave }: BlessedSacredPouchProps) => {
   const features = resolvePlaybookFeatures(data);
+  const { saveImmediate } = useCrewSave(data, onSave);
 
-  const { value: is, ref: isRef, save: saveIs } = useOptimisticField(
+  const { value: is, ref: isRef, save: saveIs } = usePlaybookField(
+    'sacredPouchIs',
     features.sacredPouchIs ?? {},
-    (next) => onSave(featurePatch(data, { sacredPouchIs: next })),
+    saveImmediate,
     'Failed to save.',
   );
   // Falls back to the legacy single-string field for characters saved before Big Magic support.
-  const { value: traits, ref: traitsRef, save: saveTraits } = useOptimisticField(
+  const { value: traits, ref: traitsRef, save: saveTraits } = usePlaybookField(
+    'sacredPouchTraits',
     features.sacredPouchTraits ?? (features.sacredPouchTrait ? { [features.sacredPouchTrait]: true } : {}),
-    (next) => onSave(featurePatch(data, { sacredPouchTraits: next })),
+    saveImmediate,
     'Failed to save.',
   );
   const traitPicks = 1 + bigMagicCount(data);

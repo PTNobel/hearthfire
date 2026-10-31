@@ -52,7 +52,7 @@ const NotesField = memo(({ label, value, onChange }: { label: string; value: str
       label={label}
       value={draft}
       rows={3}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => { setDraft(e.target.value); commit(e.target.value); }}
       onBlur={(e) => commit(e.target.value)}
     />
   );

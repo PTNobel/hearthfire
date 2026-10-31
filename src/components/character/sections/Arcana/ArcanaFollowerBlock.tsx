@@ -222,7 +222,7 @@ const HpInput = memo(({ index, followerName, isMultiHp, value, max, onFollowerHp
         value={draft}
         min={0}
         max={max}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => { commit(e.target.value); setDraft(e.target.value); }}
         onBlur={(e) => commit(e.target.value)}
         onWheel={(e) => e.currentTarget.blur()}
         aria-label={isMultiHp ? `${followerName} ${index + 1} HP` : `${followerName} HP`}
@@ -276,7 +276,7 @@ const AspectDie = memo(({ rowId, label, value, min, max, disabled, onChange }: A
       inputMode="numeric"
       disabled={disabled}
       aria-label={label}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => { commit(e.target.value); setDraft(e.target.value); }}
       onBlur={(e) => commit(e.target.value)}
       onWheel={(e) => e.currentTarget.blur()}
     />

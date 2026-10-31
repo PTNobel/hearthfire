@@ -1,185 +1,77 @@
-import { useRef, useCallback, useEffect, useState, useInsertionEffect, useId, type MutableRefObject } from 'react';
+import { useRef, useCallback, useEffect, useState, useId, type MutableRefObject } from 'react';
 import { useToastOptional } from '@/components/app/Toast/ToastContext';
 import { useSaveStatusActionsOptional } from '@/components/app/SaveStatus/SaveStatusContext';
 import { useLatest } from './useLatest';
-import { INVALID_WRITE_MESSAGE, SAVE_ERROR_MESSAGE } from '@/lib/constants';
+import { SAVE_ERROR_MESSAGE } from '@/lib/constants';
+import { useGameSyncOptional } from '@/components/app/SaveStatus/GameSyncContext';
 
 interface UseDebouncedSaveReturn<T> {
   onChange: (value: T) => void;
   flush: (value: T) => Promise<void>;
   isPending: boolean;
   isPendingRef: MutableRefObject<boolean>;
-  // Tell the hook the authoritative remote value. If it differs from what this
-  // client last saved, the dedupe key is cleared so re-submitting the old value
-  // is no longer skipped. See noteRemoteValue below.
   noteRemoteValue: (value: T) => void;
 }
 
-// One automatic retry per failed value, delayed long enough for a transient
-// connection blip to clear.
-const RETRY_DELAY_MS = 4000;
-
-// Firestore's `invalid-argument` code covers both an over-size doc and a malformed value (an
-// app bug); see INVALID_WRITE_MESSAGE for why this doesn't try to tell them apart.
-const isInvalidWrite = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null &&
-  (error as { code?: unknown }).code === 'invalid-argument';
-
+// Persist every edit locally. Network debouncing belongs to the durable queue,
+// not a timer/promise chain that disappears with the page. The delay parameter
+// remains for existing callers; GameSync coalesces their unsent assignments.
 export const useDebouncedSave = <T>(
   onSave: (value: T) => Promise<void>,
-  delay = 1500,
-  // Overrides the default error toast for callers that surface failures themselves.
+  _delay = 1500,
   onError?: (error: unknown) => void,
-  // Fires with the value once it is known persisted (a successful write, or a
-  // dedup against an already-saved value). Lets callers release per-field
-  // ownership so stale local state can't ride along on a later multi-field save.
   onSuccess?: (value: T) => void,
 ): UseDebouncedSaveReturn<T> => {
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedRef = useRef<string | null>(null);
-  // Saves run strictly one at a time on this chain — concurrent writes can
-  // commit out of order on the server, letting an older value win.
-  const chainRef = useRef<Promise<void>>(Promise.resolve());
-  const activeSavesRef = useRef(0);
-  const failedKeyRef = useRef<string | null>(null);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The value waiting on the debounce timer, so unmount/pagehide can flush it
-  // instead of silently discarding it.
-  const queuedRef = useRef<{ value: T } | null>(null);
   const onSaveRef = useLatest(onSave);
   const onErrorRef = useLatest(onError);
   const onSuccessRef = useLatest(onSuccess);
-  const revisionRef = useRef(0);
-  const draftId = useId();
+  const toastRef = useLatest(useToastOptional());
   const statusRef = useLatest(useSaveStatusActionsOptional());
-
-  const addToast = useToastOptional()?.addToast;
-
+  const draftId = useId();
+  const durable = !!useGameSyncOptional();
+  const revision = useRef(0);
+  const pendingCount = useRef(0);
+  const failed = useRef(false);
   const [isPending, setIsPending] = useState(false);
   const isPendingRef = useRef(false);
 
-  const setPending = useCallback((value: boolean) => {
+  const pending = useCallback((value: boolean) => {
     isPendingRef.current = value;
     setIsPending(value);
     statusRef.current?.reportDraft(draftId, value);
   }, [draftId, statusRef]);
 
-  // Lets the retry timer call the latest save without a circular useCallback dependency.
-  const saveRef = useRef<(value: T) => Promise<void>>(() => Promise.resolve());
-
   const save = useCallback((value: T): Promise<void> => {
-    const revision = revisionRef.current;
-    queuedRef.current = null;
-    // Any new save supersedes a scheduled retry — its payload reflects newer state.
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-    activeSavesRef.current += 1;
-    const run = chainRef.current.then(async () => {
-      const key = JSON.stringify(value);
-      // Already persisted — skip the write, but still report success so callers
-      // can release ownership of fields a redundant flush re-submitted.
-      if (key === lastSavedRef.current) {
-        failedKeyRef.current = null;
-        onSuccessRef.current?.(value);
-        return;
-      }
-      try {
-        await onSaveRef.current(value);
-        // Only mark saved on success — after a failure, the next flush/change
-        // must not be deduped away, or the edit is lost for good.
-        lastSavedRef.current = key;
-        onSuccessRef.current?.(value);
-        if (failedKeyRef.current !== null) {
-          failedKeyRef.current = null;
-        }
-      } catch (error) {
-        const isFirstFailure = failedKeyRef.current !== key;
-        failedKeyRef.current = key;
-        if (onErrorRef.current) onErrorRef.current(error);
-        // invalid-argument gets its own line; every other failure uses the generic message. Both
-        // strings match the ones useGame's reportSave emits, so the Toast dedupe collapses the
-        // two paths to one.
-        else addToast?.(isInvalidWrite(error) ? INVALID_WRITE_MESSAGE : SAVE_ERROR_MESSAGE, 'error');
-        if (isFirstFailure && revision === revisionRef.current) {
-          retryTimerRef.current = setTimeout(() => {
-            retryTimerRef.current = null;
-            if (revision === revisionRef.current) void saveRef.current(value);
-          }, RETRY_DELAY_MS);
-        }
-      }
+    const current = ++revision.current;
+    pendingCount.current++;
+    pending(true);
+    // Invoke immediately: this records the base value before another snapshot
+    // can replace it. A pending network request never blocks this call.
+    let attempt: Promise<void>;
+    try { attempt = onSaveRef.current(value); }
+    catch (error) { attempt = Promise.reject(error); }
+    return Promise.resolve(attempt).then(() => {
+      if (current === revision.current) failed.current = false;
+      onSuccessRef.current?.(value);
+    }, (error) => {
+      if (current === revision.current) failed.current = !durable;
+      if (onErrorRef.current) onErrorRef.current(error);
+      else toastRef.current?.addToast(SAVE_ERROR_MESSAGE, 'error');
     }).finally(() => {
-      activeSavesRef.current -= 1;
-      // A newer edit may already be queued on the debounce timer, not yet handed
-      // to save() — pending must stay true through it, or useFirestoreSync will
-      // apply a stale echo of the write that just resolved and clobber it.
-      if (activeSavesRef.current === 0 && queuedRef.current === null && failedKeyRef.current === null) setPending(false);
+      pendingCount.current--;
+      if (pendingCount.current === 0 && !failed.current) pending(false);
     });
-    chainRef.current = run;
-    return run;
-  }, [setPending, addToast, onErrorRef, onSaveRef, onSuccessRef]);
-  // Mirror the latest `save` into a ref so the retry timer can call it without a
-  // circular useCallback dependency. Written in an insertion effect (not during
-  // render) to satisfy react-hooks/refs; the retry timer only fires post-commit.
-  useInsertionEffect(() => {
-    saveRef.current = save;
-  });
+  }, [pending, onSaveRef, onSuccessRef, onErrorRef, toastRef, durable]);
 
-  // Called by consumers when a fresh remote value arrives. The dedupe check in
-  // `save` skips any write whose serialized value equals `lastSavedRef` — correct
-  // while we're the only writer, but if another client changed the field after
-  // our last save, the server no longer holds our value. Re-typing that value
-  // would then be silently skipped and the field would snap back to the remote
-  // one on the next echo. Clearing `lastSavedRef` once we see the remote diverge
-  // lets that legitimate revert write go through.
-  const noteRemoteValue = useCallback((value: T) => {
-    if (JSON.stringify(value) !== lastSavedRef.current) lastSavedRef.current = null;
-  }, []);
+  const onChange = useCallback((value: T) => { void save(value); }, [save]);
+  const flush = useCallback((value: T) => save(value).then(() => {
+    window.dispatchEvent(new Event('hearthfire:flush'));
+  }), [save]);
 
-  const onChange = useCallback((value: T) => {
-    revisionRef.current += 1;
-    // Cancel as soon as the user types, not when the next debounce fires.
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-    if (JSON.stringify(value) !== lastSavedRef.current) setPending(true);
-    queuedRef.current = { value };
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => save(value), delay);
-  }, [save, delay, setPending]);
+  useEffect(() => () => { statusRef.current?.reportDraft(draftId, false); }, [draftId, statusRef]);
 
-  const flush = useCallback((value: T) => {
-    revisionRef.current += 1;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (JSON.stringify(value) !== lastSavedRef.current) setPending(true);
-    return save(value);
-  }, [save, setPending]);
-
-  // Flush a queued save when the component unmounts or the page is hidden
-  // (tab close, mobile app-switch) — timers don't survive either, so without
-  // this the edit is dropped. A scheduled retry is left running on purpose:
-  // it persists the user's edit even after they navigate away.
-  useEffect(() => {
-    const flushQueued = () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-      }
-      if (queuedRef.current) void save(queuedRef.current.value);
-    };
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') flushQueued();
-    };
-    window.addEventListener('pagehide', flushQueued);
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      window.removeEventListener('pagehide', flushQueued);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      flushQueued();
-    };
-  }, [save]);
-
+  // There is no historical-value dedupe: the mutation layer compares against
+  // the actual draft baseline, so deliberately restoring an old value works.
+  const noteRemoteValue = useCallback((_value: T) => {}, []);
   return { onChange, flush, isPending, isPendingRef, noteRemoteValue };
 };

@@ -13,7 +13,7 @@ interface BackgroundProps {
   options?: BackgroundOption[];
   level?: number;
   data?: CharacterData;
-  onSave?: (data: Partial<CharacterData>) => Promise<void>;
+  onSave?: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
 }
 
 export const Background = ({ playbookKey, options, level = 0, data, onSave }: BackgroundProps = {}) => {

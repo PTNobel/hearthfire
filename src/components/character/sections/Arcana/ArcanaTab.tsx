@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useOptimisticField } from '@/hooks/useOptimisticField';
 import type { ArcanaMajorEntry, ArcanaMinorEntry, PlaybookSectionProps } from '@/types';
 import { Spinner } from '@/components/ui';
@@ -56,15 +56,17 @@ export const ArcanaTab = ({ data, onSave, adjustCharacterStats }: ArcanaTabProps
   // (see CharacterData.removedArcanaMinorIds) — omitting an entry from the array alone
   // is ambiguous between "removed" and "not yet seen" once updateCharacterData id-merges
   // this field against the freshly-read doc.
+  const minorBase = useRef<ArcanaMinorEntry[]>(data?.arcanaMinor ?? []);
+  const majorBase = useRef<ArcanaMajorEntry[]>(data?.arcanaMajor ?? []);
   const { value: arcanaMinor, ref: arcanaMinorRef, save: saveMinor } = useOptimisticField<ArcanaMinorEntry[], [removedId?: string]>(
     data?.arcanaMinor ?? [],
-    (next, removedId) => onSave({ arcanaMinor: next, ...(removedId ? { removedArcanaMinorIds: [removedId] } : {}) }),
-    'Failed to save.',
+    (next, removedId): Promise<void> => onSave({ arcanaMinor: next, ...(removedId ? { removedArcanaMinorIds: [removedId] } : {}) }, { arcanaMinor: minorBase.current }),
+    'Failed to save.', undefined, minorBase,
   );
   const { value: arcanaMajor, ref: arcanaMajorRef, save: saveMajor } = useOptimisticField<ArcanaMajorEntry[], [removedId?: string]>(
     data?.arcanaMajor ?? [],
-    (next, removedId) => onSave({ arcanaMajor: next, ...(removedId ? { removedArcanaMajorIds: [removedId] } : {}) }),
-    'Failed to save.',
+    (next, removedId): Promise<void> => onSave({ arcanaMajor: next, ...(removedId ? { removedArcanaMajorIds: [removedId] } : {}) }, { arcanaMajor: majorBase.current }),
+    'Failed to save.', undefined, majorBase,
   );
   return (
     <div className={styles.root}>

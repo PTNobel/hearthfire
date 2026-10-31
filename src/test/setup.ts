@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import 'fake-indexeddb/auto';
 import { vi } from 'vitest';
 
 // firebase.ts throws at import time if any VITE_FIREBASE_* var is missing.

@@ -3,11 +3,14 @@ import clsx from 'clsx';
 import { Icon, Text } from '@/components/ui';
 import { useSaveStatusOptional } from './SaveStatusContext';
 import styles from './SaveStatus.module.css';
+import { useGameSyncOptional } from './GameSyncContext';
+import { DurableSaveStatus } from './DurableSaveStatus';
 
 // A quiet header status, including on phones. Network availability is a hint;
 // only a resolved write is treated as a server acknowledgement.
 export const SaveStatus = () => {
   const ctx = useSaveStatusOptional();
+  const store = useGameSyncOptional();
   const [online, setOnline] = useState(() => navigator.onLine);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -19,6 +22,7 @@ export const SaveStatus = () => {
     };
   }, []);
 
+  if (store) return <DurableSaveStatus store={store} online={online} />;
   if (!ctx) return null;
   const { status, pendingEdits, lastSavedAt } = ctx;
   const label = !online ? 'Offline'

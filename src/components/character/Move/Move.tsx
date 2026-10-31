@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import {
   Checkbox,
   CheckboxGroup,
@@ -13,9 +13,7 @@ import {
 import type { MoveBlock, MoveDefinition, RightControlSpec } from '@/types';
 import { parseMoveRoll } from '@/lib/parseMoveRoll';
 import { resolveRollStat } from '@/lib/rollDice';
-import { useDebouncedSave } from '@/hooks/useDebouncedSave';
-import { useFirestoreSync } from '@/hooks/useFirestoreSync';
-import { useLatest } from '@/hooks/useLatest';
+import { useDebouncedTextField } from '@/hooks/useDebouncedTextField';
 import { RollAffordance, type StatOption } from './RollAffordance';
 import { useCharacterRollOptional } from './CharacterRollContext';
 import styles from './Move.module.css';
@@ -61,37 +59,18 @@ const TakeNotesField = ({
   onSave: (value: string) => Promise<void>;
   disabled: boolean;
 }) => {
-  const [local, setLocal] = useState(firestoreValue);
-  const pendingRef = useRef(false);
-  const onSaveRef = useLatest(onSave);
-  const saveFn = useCallback(
-    (v: string) => onSaveRef.current(v).finally(() => { pendingRef.current = false; }),
-    [onSaveRef],
-  );
-  const { onChange: debouncedChange, flush } = useDebouncedSave(saveFn, 1000);
-  useFirestoreSync(firestoreValue, setLocal, pendingRef);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setLocal(val);
-    pendingRef.current = true;
-    debouncedChange(val);
-  }, [debouncedChange]);
-
-  const handleBlur = useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
-    flush(e.target.value).finally(() => { pendingRef.current = false; });
-  }, [flush]);
+  const field = useDebouncedTextField(firestoreValue, onSave);
 
   return (
     <Input
       multiline
-      value={local}
+      value={field.value}
       placeholder="Note which move you chose…"
       aria-label="Take notes"
       rows={2}
       disabled={disabled}
-      onChange={handleChange}
-      onBlur={handleBlur}
+      onChange={field.onChange}
+      onBlur={field.onBlur}
     />
   );
 };

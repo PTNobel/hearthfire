@@ -93,32 +93,32 @@ describe('useNotesLock', () => {
 
     // A second blur with nothing new typed doesn't write again.
     act(() => { result.current.noteBlur(); });
-    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(2);
 
     // The lock is still released on the idle timer.
     act(() => { vi.advanceTimersByTime(NOTES_IDLE_MS); });
     expect(release).toHaveBeenCalledTimes(1);
   });
 
-  it('discards the edit and never releases when another tab won the claim', async () => {
+  it('retains the edit and never releases when another tab won the claim', async () => {
     const { result, claim, release, onClaimRejected } = setup();
     claim.mockResolvedValueOnce(false);
     act(() => { result.current.noteChange(); });
     await flush();
 
     expect(onClaimRejected).toHaveBeenCalledTimes(1);
-    expect(result.current.isBusy()).toBe(false);
+    expect(result.current.isBusy()).toBe(true);
     act(() => { vi.advanceTimersByTime(NOTES_IDLE_MS); });
     expect(release).not.toHaveBeenCalled();
   });
 
-  it('treats a failed claim like a rejected one', async () => {
+  it('preserves a draft after a failed claim', async () => {
     const { result, claim, onClaimRejected } = setup();
     claim.mockRejectedValueOnce(new Error('offline'));
     act(() => { result.current.noteChange(); });
     await flush();
     expect(onClaimRejected).toHaveBeenCalledTimes(1);
-    expect(result.current.isBusy()).toBe(false);
+    expect(result.current.isBusy()).toBe(true);
   });
 
   it('releases as soon as a slow claim lands if the idle timer already fired', async () => {

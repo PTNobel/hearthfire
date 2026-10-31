@@ -89,6 +89,7 @@ export const Home = () => {
               <Stack gap={3}>
                 <Button type="button" size="lg" fullWidth onClick={handleContinue}>Continue game</Button>
                 <Button type="button" variant="ghost" fullWidth onClick={handleForget}>Forget this device</Button>
+                <Text color="muted" size="xs">Forgetting removes remembered access. Saved drafts and offline game data stay in this browser.</Text>
                 {error && <Text color="muted" size="xs" role="alert">{error}</Text>}
               </Stack>
             ) : <form onSubmit={handleOpen} className={styles.cardBody}>

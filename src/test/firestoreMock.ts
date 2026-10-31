@@ -27,6 +27,7 @@ const makeSnapshot = (path: string) => {
   return {
     id,
     exists: () => data !== undefined,
+    metadata: { fromCache: false },
     // Return a structural clone so callers can't mutate the store in place,
     // mirroring Firestore's snapshot semantics.
     data: () => (data === undefined ? undefined : structuredClone(data)),
@@ -98,6 +99,11 @@ export const firestoreStore = {
     docs.delete(path);
     emit(path);
   },
+  emitCached(path: string, data: DocData) {
+    listeners.get(path)?.forEach((listener) => listener({
+      ...makeSnapshot(path), exists: () => true, data: () => structuredClone(data), metadata: { fromCache: true },
+    }));
+  },
 };
 
 // Build the object passed to vi.mock('firebase/firestore', ...). Spies are
@@ -105,8 +111,8 @@ export const firestoreStore = {
 export const firestoreMockModule = () => {
   let autoId = 0;
 
-  const doc = vi.fn((_db: unknown, collectionPath: string, id: string): Ref => ({
-    path: `${collectionPath}/${id}`,
+  const doc = vi.fn((_db: unknown, ...segments: string[]): Ref => ({
+    path: segments.join('/'),
     __kind: 'doc',
   }));
 
@@ -156,8 +162,8 @@ export const firestoreMockModule = () => {
 
   // Minimal transaction implementation: get() reads current state, set()/update()
   // mutate the store. No real isolation, but enough to exercise read-modify-write
-  // logic (withCharacters, createGameWithId) deterministically.
-  const runTransaction = vi.fn(async (_db: unknown, updater: (tx: Transaction) => Promise<void>) => {
+  // mutation logic deterministically. Real concurrency is tested in the emulator.
+  const runTransaction = vi.fn(async (_db: unknown, updater: (tx: Transaction) => Promise<unknown>) => {
     const tx: Transaction = {
       get: async (ref: Ref) => makeSnapshot(ref.path),
       set: (ref: Ref, data: DocData) => {
@@ -170,7 +176,7 @@ export const firestoreMockModule = () => {
         emit(ref.path);
       },
     };
-    await updater(tx);
+    return await updater(tx);
   });
 
   const arrayUnion = vi.fn((...values: unknown[]): ArrayUnionOp => ({
@@ -189,6 +195,7 @@ export const firestoreMockModule = () => {
     doc,
     collection,
     getDoc,
+    getDocFromServer: getDoc,
     updateDoc,
     setDoc,
     addDoc,

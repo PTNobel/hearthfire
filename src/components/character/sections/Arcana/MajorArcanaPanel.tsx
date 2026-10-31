@@ -58,7 +58,7 @@ interface MajorArcanaPanelProps {
   saveMajor: (next: ArcanaMajorEntry[], removedId?: string) => void;
   // Writer for the absolute field patch a consequence action produces (debility flags). Armor/HP go
   // through adjustCharacterStats instead, since those are additive.
-  saveCharacterData: (patch: Partial<CharacterData>) => Promise<void>;
+  saveCharacterData: (patch: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   // Transactional Armor/HP adjuster: applies a consequence's signed delta against the freshly-read doc.
   adjustCharacterStats: (deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
 }

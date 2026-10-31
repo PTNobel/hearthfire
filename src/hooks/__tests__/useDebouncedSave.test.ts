@@ -1,384 +1,66 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDebouncedSave } from '../useDebouncedSave';
-import { INVALID_WRITE_MESSAGE } from '@/lib/constants';
 
-const addToastSpy = vi.fn();
-vi.mock('@/components/app/Toast/ToastContext', () => ({
-  useToastOptional: () => ({ addToast: addToastSpy }),
-}));
+vi.mock('@/components/app/Toast/ToastContext', () => ({ useToastOptional: () => ({ addToast: vi.fn() }) }));
 
-beforeEach(() => { vi.useFakeTimers(); addToastSpy.mockClear(); });
-afterEach(() => {
-  vi.useRealTimers();
-  vi.restoreAllMocks();
-});
-
-describe('useDebouncedSave', () => {
-  it('cancels an old retry immediately when newer typing is still debouncing', async () => {
-    const onSave = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
-    const { result, unmount } = renderHook(() => useDebouncedSave(onSave, 1500));
-    await act(async () => { await result.current.flush('old'); });
-    await act(async () => { vi.advanceTimersByTime(3500); });
-    act(() => { result.current.onChange('new'); });
-    await act(async () => { vi.advanceTimersByTime(600); });
-    expect(onSave).toHaveBeenCalledTimes(1);
-    // Navigating away during the new debounce must still flush the new value.
-    await act(async () => { unmount(); });
-    expect(onSave).toHaveBeenLastCalledWith('new');
-    expect(onSave).toHaveBeenCalledTimes(2);
+describe('local draft acceptance', () => {
+  it('submits each revision immediately instead of leaving typing on a timer', async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDebouncedSave(save));
+    await act(async () => { result.current.onChange('A'); result.current.onChange('AB'); });
+    expect(save.mock.calls).toEqual([['A'], ['AB']]);
+    expect(result.current.isPending).toBe(false);
   });
-
-  it('does not retry a slow failed write after a newer revision is queued', async () => {
+  it('does not block a newer draft behind an unresolved earlier request', async () => {
+    let resolve: () => void = () => {};
+    const save = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => { resolve = r; })).mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDebouncedSave(save));
+    await act(async () => { result.current.onChange('first'); result.current.onChange('latest'); });
+    expect(save).toHaveBeenLastCalledWith('latest');
+    expect(result.current.isPending).toBe(true);
+    await act(async () => { resolve(); });
+    expect(result.current.isPending).toBe(false);
+  });
+  it('an obsolete failure cannot make a newer accepted revision fail', async () => {
     let reject: (error: Error) => void = () => {};
-    const onSave = vi.fn().mockImplementationOnce(() => new Promise<void>((_, r) => { reject = r; }))
-      .mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 10_000));
-    await act(async () => { void result.current.flush('old'); });
-    act(() => { result.current.onChange('new'); });
-    await act(async () => { reject(new Error('offline')); });
-    await act(async () => { vi.advanceTimersByTime(4000); });
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(result.current.isPending).toBe(true);
-    await act(async () => { vi.advanceTimersByTime(6000); });
-    expect(onSave).toHaveBeenLastCalledWith('new');
+    const save = vi.fn().mockImplementationOnce(() => new Promise<void>((_, r) => { reject = r; })).mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDebouncedSave(save));
+    await act(async () => { result.current.onChange('first'); result.current.onChange('latest'); });
+    await act(async () => { reject(new Error('old failure')); });
     expect(result.current.isPending).toBe(false);
   });
-
-  it('retains unsaved ownership after the automatic retry also fails', async () => {
-    const onSave = vi.fn().mockRejectedValue(new Error('offline'));
-    const { result } = renderHook(() => useDebouncedSave(onSave));
+  it('retains a failed draft until a later attempt is accepted', async () => {
+    const save = vi.fn().mockRejectedValue(new Error('storage unavailable'));
+    const { result } = renderHook(() => useDebouncedSave(save));
     await act(async () => { await result.current.flush('draft'); });
-    await act(async () => { vi.advanceTimersByTime(4000); });
-    expect(result.current.isPending).toBe(true);
     expect(result.current.isPendingRef.current).toBe(true);
-    onSave.mockResolvedValue(undefined);
+    save.mockResolvedValue(undefined);
     await act(async () => { await result.current.flush('draft'); });
-    expect(result.current.isPending).toBe(false);
-    expect(addToastSpy).not.toHaveBeenCalledWith('Changes saved.', 'success');
+    expect(result.current.isPendingRef.current).toBe(false);
   });
-
-  it('does not call onSave until the delay elapses', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    act(() => { result.current.onChange('hello'); });
-    expect(onSave).not.toHaveBeenCalled();
-
-    await act(async () => { vi.advanceTimersByTime(1500); });
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(onSave).toHaveBeenCalledWith('hello');
+  it('does not suppress a deliberate return to a previously submitted value', async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDebouncedSave(save));
+    await act(async () => { await result.current.flush('B'); });
+    result.current.noteRemoteValue('C');
+    await act(async () => { await result.current.flush('B'); });
+    expect(save).toHaveBeenCalledTimes(2);
   });
-
-  it('does not fire a second call when the same value is submitted twice', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('same');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    await act(async () => {
-      result.current.onChange('same');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
+  it('acknowledges a value only after local acceptance', async () => {
+    let resolve: () => void = () => {};
+    const save = vi.fn(() => new Promise<void>((r) => { resolve = r; }));
+    const accepted = vi.fn();
+    const { result } = renderHook(() => useDebouncedSave(save, 1500, undefined, accepted));
+    act(() => { result.current.onChange('draft'); });
+    expect(accepted).not.toHaveBeenCalled();
+    await act(async () => { resolve(); });
+    expect(accepted).toHaveBeenCalledWith('draft');
   });
-
-  it('isPending is true while debounce is queued and false after save resolves', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    expect(result.current.isPending).toBe(false);
-
-    act(() => { result.current.onChange('hello'); });
-    expect(result.current.isPending).toBe(true);
-
-    await act(async () => { vi.advanceTimersByTime(1500); });
-    expect(result.current.isPending).toBe(false);
-  });
-
-  it('isPending remains false when same value is queued again (no-op save)', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('same');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(result.current.isPending).toBe(false);
-
-    act(() => { result.current.onChange('same'); });
-    expect(result.current.isPending).toBe(false);
-
-    await act(async () => { vi.advanceTimersByTime(1500); });
-    expect(result.current.isPending).toBe(false);
-  });
-
-  it('keeps the remote-sync guard raised after onSave rejects', async () => {
-    const onSave = vi.fn().mockRejectedValue(new Error('network error'));
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    act(() => { result.current.onChange('hello'); });
-    expect(result.current.isPending).toBe(true);
-
-    await act(async () => { vi.advanceTimersByTime(1500); });
-    expect(result.current.isPending).toBe(true);
-  });
-
-  it('retries the same value after a failed save instead of deduping it away', async () => {
-    const onSave = vi.fn()
-      .mockRejectedValueOnce(new Error('network error'))
-      .mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('hello');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    // A flush with the same value must re-attempt — the first write never landed.
-    await act(async () => { await result.current.flush('hello'); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-
-    // After the successful retry, the same value dedupes again.
-    await act(async () => { await result.current.flush('hello'); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-  });
-
-  it('flushes a queued save on unmount instead of discarding it', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result, unmount } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    act(() => { result.current.onChange('hello'); });
-    expect(onSave).not.toHaveBeenCalled();
-
-    await act(async () => { unmount(); });
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(onSave).toHaveBeenCalledWith('hello');
-  });
-
-  it('flushes a queued save when the page is hidden', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    act(() => { result.current.onChange('hello'); });
-    expect(onSave).not.toHaveBeenCalled();
-
-    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    await act(async () => {
-      document.dispatchEvent(new Event('visibilitychange'));
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(onSave).toHaveBeenCalledWith('hello');
-  });
-
-  it('does not double-save when an identical save is already in flight', async () => {
-    let resolveSave: () => void = () => {};
-    const onSave = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveSave = resolve; }));
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('hello');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    // Blur-flush of the same value queues behind the in-flight write, then
-    // dedupes once it lands — no second write.
-    let flushPromise: Promise<void> = Promise.resolve();
-    act(() => { flushPromise = result.current.flush('hello'); });
-
-    await act(async () => {
-      resolveSave();
-      await flushPromise;
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(result.current.isPending).toBe(false);
-  });
-
-  it('runs saves one at a time so a slow write cannot finish after a newer one', async () => {
-    const resolvers: Array<() => void> = [];
-    const onSave = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolvers.push(resolve); }));
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('first');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    // Second save waits for the first to settle instead of racing it.
-    await act(async () => {
-      result.current.onChange('second');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    await act(async () => { resolvers[0]!(); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-    expect(onSave).toHaveBeenLastCalledWith('second');
-    expect(result.current.isPending).toBe(true);
-
-    await act(async () => { resolvers[1]!(); });
-    expect(result.current.isPending).toBe(false);
-  });
-
-  it('isPending stays true across a resolving save when a newer edit is already queued behind it', async () => {
-    const resolvers: Array<() => void> = [];
-    const onSave = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolvers.push(resolve); }));
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    // First edit flushes (e.g. blur) and its write is in flight.
-    await act(async () => { void result.current.flush('first'); });
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(result.current.isPending).toBe(true);
-
-    // A second edit arrives before the first write resolves — it's queued on
-    // the debounce timer, not yet handed to save().
-    act(() => { result.current.onChange('second'); });
-    expect(result.current.isPending).toBe(true);
-
-    // The first write resolves. Without the queuedRef check, isPending would
-    // drop to false here even though 'second' hasn't saved yet — that gap is
-    // what let useFirestoreSync apply a stale echo and clobber local state.
-    await act(async () => { resolvers[0]!(); });
-    expect(result.current.isPending).toBe(true);
-    expect(onSave).toHaveBeenCalledOnce();
-
-    // The queued edit's debounce timer fires, handing it to save().
-    await act(async () => { vi.advanceTimersByTime(1500); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-    expect(onSave).toHaveBeenLastCalledWith('second');
-    expect(result.current.isPending).toBe(true);
-
-    await act(async () => { resolvers[1]!(); });
-    expect(result.current.isPending).toBe(false);
-  });
-
-  it('automatically retries a failed save once', async () => {
-    const onSave = vi.fn()
-      .mockRejectedValueOnce(new Error('network error'))
-      .mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('hello');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    await act(async () => { vi.advanceTimersByTime(4000); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not auto-retry the same failed value more than once', async () => {
-    const onSave = vi.fn().mockRejectedValue(new Error('network error'));
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('hello');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    await act(async () => { vi.advanceTimersByTime(4000); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-
-    await act(async () => { vi.advanceTimersByTime(60000); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-  });
-
-  it('a newer edit cancels a scheduled retry of the older value', async () => {
-    const onSave = vi.fn()
-      .mockRejectedValueOnce(new Error('network error'))
-      .mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('old');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledOnce();
-
-    // The user edits again before the retry fires — only the new value saves.
-    await act(async () => { await result.current.flush('new'); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-    expect(onSave).toHaveBeenLastCalledWith('new');
-
-    await act(async () => { vi.advanceTimersByTime(60000); });
-    expect(onSave).toHaveBeenCalledTimes(2);
-  });
-
-  it('re-saves a value another client overwrote after noteRemoteValue clears the dedupe (#254)', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    // This client saves 'X'.
-    await act(async () => {
-      result.current.onChange('X');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledTimes(1);
-
-    // Another client changed the server to 'Y'; our sync layer reports the
-    // divergent remote value, which must clear the dedupe for 'X'.
-    act(() => { result.current.noteRemoteValue('Y'); });
-
-    // The user types 'X' again — without the clear this would be deduped away,
-    // leaving the server on 'Y'. It must now go through.
-    await act(async () => {
-      result.current.onChange('X');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledTimes(2);
-    expect(onSave).toHaveBeenLastCalledWith('X');
-  });
-
-  it('noteRemoteValue of the value we just saved leaves the dedupe intact', async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('X');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledTimes(1);
-
-    // The remote echo matches what we saved — this is our own write, so the
-    // dedupe must still skip a redundant re-save of 'X'.
-    act(() => { result.current.noteRemoteValue('X'); });
-    await act(async () => {
-      result.current.onChange('X');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onSave).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the invalid-write message (not the generic one) on an invalid-argument failure (#254)', async () => {
-    const onSave = vi.fn().mockRejectedValue(Object.assign(new Error('too big'), { code: 'invalid-argument' }));
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500));
-
-    await act(async () => {
-      result.current.onChange('hello');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(addToastSpy).toHaveBeenCalledWith(INVALID_WRITE_MESSAGE, 'error');
-  });
-
-  it('reports failures through onError instead of the default handling when provided', async () => {
-    const error = new Error('network error');
-    const onSave = vi.fn().mockRejectedValue(error);
-    const onError = vi.fn();
-    const { result } = renderHook(() => useDebouncedSave(onSave, 1500, onError));
-
-    await act(async () => {
-      result.current.onChange('hello');
-      vi.advanceTimersByTime(1500);
-    });
-    expect(onError).toHaveBeenCalledWith(error);
+  it('has already submitted a draft when the component unmounts', async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = renderHook(() => useDebouncedSave(save));
+    await act(async () => { result.current.onChange('draft'); unmount(); });
+    expect(save.mock.calls).toEqual([['draft']]);
   });
 });

@@ -1,9 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import { useLatest } from './useLatest';
 import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
 import { useOptimisticField } from './useOptimisticField';
-import { useDebouncedSave } from './useDebouncedSave';
-import { useFirestoreSync } from './useFirestoreSync';
 import type { CharacterData, PlaybookFeatures } from '@/types';
 
 // Intentionally broad — callers are responsible for passing the right key type.
@@ -33,22 +31,23 @@ interface UsePlaybookCheckedWithAnswersReturn extends UsePlaybookCheckedReturn {
 }
 
 // The checkbox half, shared by both exported hooks. Delegates the optimistic
-// value, rollback, error toast, and remote-echo gating to useOptimisticField
+// value, failed-draft retention, error toast, and remote-echo gating to useOptimisticField
 // rather than re-implementing them — that hook's useFirestoreSync also *defers*
 // a remote value that lands mid-save and flushes it on settle, where the
 // hand-rolled guard this replaced dropped it outright (#171).
 const useCheckedField = (
   data: CharacterData | undefined,
-  onSave: (data: Partial<CharacterData>) => Promise<void>,
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>,
   checkedKey: FeatureKey,
 ): UsePlaybookCheckedReturn => {
   const onSaveRef = useLatest(onSave);
   const dataRef = useLatest(data);
 
+  const editBase = useRef(featureRecord(data, checkedKey, EMPTY_CHECKED));
   const { value: checked, save } = useOptimisticField(
     featureRecord(data, checkedKey, EMPTY_CHECKED),
-    (next) => onSaveRef.current(featurePatch(dataRef.current, { [checkedKey]: next })),
-    SAVE_ERROR,
+    (next) => onSaveRef.current(featurePatch(dataRef.current, { [checkedKey]: next }), featurePatch(dataRef.current, { [checkedKey]: editBase.current })),
+    SAVE_ERROR, undefined, editBase,
   );
 
   const handleChange = useCallback((id: string, value: boolean) => {
@@ -64,7 +63,7 @@ export const usePlaybookChecked = useCheckedField;
 
 export const usePlaybookCheckedWithAnswers = (
   data: CharacterData | undefined,
-  onSave: (data: Partial<CharacterData>) => Promise<void>,
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>,
   checkedKey: FeatureKey,
   answersKey: FeatureKey,
 ): UsePlaybookCheckedWithAnswersReturn => {
@@ -72,31 +71,18 @@ export const usePlaybookCheckedWithAnswers = (
   const onSaveRef = useLatest(onSave);
   const dataRef = useLatest(data);
 
-  // Answers are free text, so they debounce rather than saving per keystroke.
-  const [answers, setAnswers] = useState<Record<string, string>>(
-    () => featureRecord(data, answersKey, EMPTY_ANSWERS),
+  const editBase = useRef(featureRecord(data, answersKey, EMPTY_ANSWERS));
+  const { value: answers, save } = useOptimisticField(
+    featureRecord(data, answersKey, EMPTY_ANSWERS),
+    (next) => onSaveRef.current(featurePatch(dataRef.current, { [answersKey]: next }), featurePatch(dataRef.current, { [answersKey]: editBase.current })),
+    SAVE_ERROR, undefined, editBase,
   );
-  const answersRef = useLatest(answers);
-
-  const saveAnswers = useCallback(
-    (a: Record<string, string>) => onSaveRef.current(featurePatch(dataRef.current, { [answersKey]: a })),
-    [answersKey], // eslint-disable-line react-hooks/exhaustive-deps -- onSaveRef/dataRef are stable refs
-  );
-  const { onChange: debouncedAnswers, flush, isPendingRef } = useDebouncedSave(saveAnswers);
-
-  // Same deferred-flush gate as the checkbox half. useDebouncedSave re-renders on
-  // settle (its isPending state), which is what lets the deferred value flush.
-  useFirestoreSync(featureRecord(data, answersKey, EMPTY_ANSWERS), setAnswers, isPendingRef);
-
   const handleAnswer = useCallback((key: string, value: string) => {
-    const next = { ...answersRef.current, [key]: value };
-    setAnswers(next);
-    debouncedAnswers(next);
-  }, [debouncedAnswers]); // eslint-disable-line react-hooks/exhaustive-deps -- answersRef is a stable ref
-
+    void save((current) => ({ ...current, [key]: value }));
+  }, [save]);
   const handleFlushAnswers = useCallback(() => {
-    flush(answersRef.current);
-  }, [flush]); // eslint-disable-line react-hooks/exhaustive-deps -- answersRef is a stable ref
+    window.dispatchEvent(new Event('hearthfire:flush'));
+  }, []);
 
   return { checked, handleChange, answers, handleAnswer, flushAnswers: handleFlushAnswers };
 };

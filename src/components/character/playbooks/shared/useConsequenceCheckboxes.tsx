@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { usePlaybookField } from '@/hooks/usePlaybookField';
 import { resolvePlaybookFeatures } from '@/lib/resolvePlaybookFeatures';
 import type { CharacterData, PlaybookFeatures } from '@/types';
 
@@ -14,16 +14,15 @@ interface ConsequenceLabel {
 
 export const useConsequenceCheckboxes = (
   data: CharacterData | undefined,
-  saveImmediate: (patch: Partial<PlaybookFeatures>) => Promise<void>,
+  saveImmediate: (patch: Partial<PlaybookFeatures>, base?: Partial<PlaybookFeatures>) => Promise<void>,
   consequenceKey: ConsequenceKey,
   labels: ConsequenceLabel[],
   isDisabled?: (id: string, checked: Record<string, boolean>) => boolean,
 ) => {
   const firestoreValue = (resolvePlaybookFeatures(data)[consequenceKey] as Record<string, boolean> | undefined) ?? {};
 
-  const { value: checked, ref: checkedRef, save } = useOptimisticField(
-    firestoreValue,
-    (next) => saveImmediate({ [consequenceKey]: next }),
+  const { value: checked, ref: checkedRef, save } = usePlaybookField(
+    consequenceKey, firestoreValue, saveImmediate,
     'Failed to save.',
   );
 

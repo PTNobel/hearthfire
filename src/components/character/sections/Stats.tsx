@@ -141,7 +141,7 @@ const REQUIRED_STAT_KEYS: (keyof StatsState)[] = ['statStr', 'statDex', 'statInt
 
 interface StatsProps {
   data?: CharacterData;
-  onSave?: (data: Partial<CharacterData>) => Promise<void>;
+  onSave?: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   hpMax?: number;
   damage?: string;
   scoreInstruction?: string;

@@ -28,30 +28,24 @@ interface CurrencyFieldProps {
 const CurrencyField = ({ label, fieldKey, savedValue, onSave }: CurrencyFieldProps) => {
   const [local, setLocal] = useState(String(savedValue));
   const isFocusedRef = useRef(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useLatest(onSave);
 
   useEffect(() => {
     if (!isFocusedRef.current) setLocal(String(savedValue));
   }, [savedValue]);
 
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     setLocal(raw);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const parsed = parseInt(raw, 10);
-      if (!isNaN(parsed) && parsed >= 0) onSaveRef.current(fieldKey, parsed);
-    }, 600);
+    const parsed = parseInt(raw, 10);
+    onSaveRef.current(fieldKey, isNaN(parsed) || parsed < 0 ? 0 : parsed);
   }, [fieldKey, onSaveRef]);
 
   const handleFocus = useCallback(() => { isFocusedRef.current = true; }, []);
 
   const handleBlur = useCallback(() => {
     isFocusedRef.current = false;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     const parsed = parseInt(local, 10);
     const clamped = isNaN(parsed) || parsed < 0 ? 0 : parsed;
     setLocal(String(clamped));

@@ -41,6 +41,7 @@ export const SharedNotes = ({ notesKey, html, lock, actions, warning }: SharedNo
           )}
           <Suspense fallback={<div className={styles.loading}><Spinner /></div>}>
             <NotesEditor
+              key={notesKey}
               html={html ?? ''}
               lock={lock}
               label="Notes"

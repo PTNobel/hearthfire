@@ -53,7 +53,7 @@ describe('CustomMoves', () => {
 
     expect(onSave).toHaveBeenCalledWith({
       customMoves: [{ id: expect.any(String), name: 'My Move', text: 'Does a thing' }],
-    });
+    }, { customMoves: [] });
     expect(screen.getByLabelText('Move name')).toHaveValue('');
     expect(screen.getByLabelText('Move text')).toHaveValue('');
     expect(screen.getByText('My Move')).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('CustomMoves', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Placeholder Move' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove move' }));
 
-    expect(onSave).toHaveBeenCalledWith({ customMoves: [] });
+    expect(onSave).toHaveBeenCalledWith({ customMoves: [] }, { customMoves: SEEDED.customMoves });
     expect(screen.getByText('No custom moves yet.')).toBeInTheDocument();
   });
 });

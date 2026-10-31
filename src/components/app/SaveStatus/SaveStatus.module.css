@@ -10,6 +10,9 @@
   color: var(--text-warning);
 }
 
+.comparison { display: grid; gap: var(--spacing-3); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--spacing-2); }
+
 .spinner {
   width: 14px;
   height: 14px;

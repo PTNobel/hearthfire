@@ -8,7 +8,7 @@ import styles from './Moves.module.css';
 
 interface CustomMovesProps {
   data: CharacterData | undefined;
-  onSave: (data: Partial<CharacterData>) => Promise<void>;
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
 }
 
 export const CustomMoves = ({ data, onSave }: CustomMovesProps) => {

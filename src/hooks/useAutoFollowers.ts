@@ -7,7 +7,7 @@ const DOG_POSSESSION_IDS = new Set(['mastiffs', 'hounds', 'good-dog']);
 export const useAutoFollowers = (
   specialPossessions: CharacterData['specialPossessions'],
   inserts: string[] | undefined,
-  onSave: (data: Partial<CharacterData>) => Promise<void>,
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>,
 ) => {
   const hasAutoAddedRef = useRef(false);
 

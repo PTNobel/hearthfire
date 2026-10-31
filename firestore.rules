@@ -9,6 +9,13 @@ service cloud.firestore {
         && data.characters.size() <= 20;
     }
 
+    function hasSync(data) {
+      return data.sync is map
+        && data.sync.protocol == 2
+        && data.sync.generation is string
+        && data.sync.revision is int;
+    }
+
     function isAllowedSession(id) {
       // This template denies access until the deploy script substitutes the
       // shared session ID. Never commit the generated rules file.
@@ -18,7 +25,25 @@ service cloud.firestore {
     match /games/{id} {
       allow get: if isAllowedSession(id);
       allow list, delete: if false;
-      allow create, update: if isAllowedSession(id) && isValidGame(request.resource.data);
+      allow create: if isAllowedSession(id) && isValidGame(request.resource.data)
+        && hasSync(request.resource.data) && request.resource.data.sync.revision == 0;
+      // Old tabs preserve the previous revision or omit it entirely. Reject
+      // those writes rather than letting them bypass conflict checks.
+      allow update: if isAllowedSession(id) && isValidGame(request.resource.data)
+        && hasSync(request.resource.data)
+        && request.resource.data.sync.revision == resource.data.get('sync', {}).get('revision', 0) + 1;
+
+      match /writes/{writeId} {
+        allow get: if isAllowedSession(id);
+        allow list, update, delete: if false;
+        // Receipt and game mutation must commit atomically. Receipts make a
+        // restart after server commit safe for non-idempotent stat adjustments.
+        allow create: if isAllowedSession(id)
+          && request.resource.data.keys().hasOnly(['generation', 'committedAt'])
+          && request.resource.data.generation is string
+          && request.resource.data.committedAt is number
+          && getAfter(/databases/$(database)/documents/games/$(id)).data.sync.lastWrite == writeId;
+      }
     }
   }
 }

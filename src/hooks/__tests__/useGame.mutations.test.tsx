@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { firestoreMockModule, firestoreStore } from '@/test/firestoreMock';
 import { addToastSpy, toastModuleMock } from '@/test/toastMock';
-import { INVALID_WRITE_MESSAGE, SAVE_ERROR_MESSAGE } from '@/lib/constants';
+import { INVALID_WRITE_MESSAGE } from '@/lib/constants';
 import { NOTES_CLIENT_ID, NOTES_STALE_MS } from '@/lib/sharedNotes';
 
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
@@ -10,6 +10,8 @@ vi.mock('firebase/firestore', () => firestoreMockModule());
 vi.mock('@/components/app/Toast/ToastContext', () => toastModuleMock());
 
 import { useGame } from '../useGame';
+import { getGameSync } from '@/lib/gameSync';
+import { changeQueue, emptyQueue } from '@/lib/syncStorage';
 import { SaveStatusProvider } from '@/components/app/SaveStatus/SaveStatusProvider';
 import { useSaveStatus } from '@/components/app/SaveStatus/SaveStatusContext';
 import type { Character, LoggedRoll, NotesLock } from '@/types';
@@ -39,7 +41,18 @@ const roll = (id: string, overrides: Partial<LoggedRoll> = {}): LoggedRoll => ({
   ...overrides,
 });
 
-beforeEach(() => { firestoreStore.reset(); addToastSpy.mockClear(); });
+beforeEach(async () => {
+  await changeQueue('g1', () => emptyQueue('g1'));
+  firestoreStore.reset(); addToastSpy.mockClear();
+});
+
+// Mutation assertions inspect the server explicitly after durable acceptance.
+const syncWrite = async (accepted: Promise<void>) => {
+  await accepted;
+  const store = getGameSync('g1');
+  await store.send();
+  if (store.getSnapshot().queue.error) throw new Error(store.getSnapshot().queue.error);
+};
 
 const renderGame = () => renderHook(() => useGame('g1'));
 
@@ -99,7 +112,7 @@ describe('useGame mutations', () => {
     const { result } = renderGame();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => { await result.current.addCharacter(char('b')); });
+    await act(async () => { await syncWrite(result.current.addCharacter(char('b'))); });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['a', 'b']);
   });
@@ -110,7 +123,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     // A double-tap or post-network-blip retry adds the same id twice.
-    await act(async () => { await result.current.addCharacter(char('a')); });
+    await act(async () => { await syncWrite(result.current.addCharacter(char('a'))); });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['a']);
   });
@@ -120,7 +133,7 @@ describe('useGame mutations', () => {
     const { result } = renderGame();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => { await result.current.removeCharacter('b'); });
+    await act(async () => { await syncWrite(result.current.removeCharacter('b')); });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['a', 'c']);
   });
@@ -131,7 +144,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.reorderCharacters([char('c'), char('a'), char('b')]);
+      await syncWrite(result.current.reorderCharacters([char('c'), char('a'), char('b')]));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['c', 'a', 'b']);
@@ -145,7 +158,7 @@ describe('useGame mutations', () => {
 
     // A stale client reorders against a character that was concurrently removed.
     await act(async () => {
-      await result.current.reorderCharacters([char('b'), char('ghost'), char('a')]);
+      await syncWrite(result.current.reorderCharacters([char('b'), char('ghost'), char('a')]));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['b', 'a']);
@@ -164,7 +177,7 @@ describe('useGame mutations', () => {
     });
 
     await act(async () => {
-      await result.current.reorderCharacters([char('b'), char('a')]);
+      await syncWrite(result.current.reorderCharacters([char('b'), char('a')]));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.map((c) => c.id)).toEqual(['b', 'a', 'c']);
@@ -180,7 +193,7 @@ describe('useGame mutations', () => {
 
     // A patch built from a stale snapshot only carries the key the user changed.
     await act(async () => {
-      await result.current.updateCharacterData('a', { playbookFeatures: { old: 2 } as never });
+      await syncWrite(result.current.updateCharacterData('a', { playbookFeatures: { old: 2 } as never }));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Array<{ id: string; data?: { playbookFeatures?: Record<string, unknown> } }>;
     // The concurrently-written `keep` key survives the merge.
@@ -199,7 +212,7 @@ describe('useGame mutations', () => {
     // and would let the freshly-read doc's `followers` value survive. deleteFeatureKeys
     // is the explicit sentinel that actually removes it.
     await act(async () => {
-      await result.current.updateCharacterData('a', { deleteFeatureKeys: ['followers'] } as never);
+      await syncWrite(result.current.updateCharacterData('a', { deleteFeatureKeys: ['followers'] } as never));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Array<{ id: string; data?: { playbookFeatures?: Record<string, unknown>; deleteFeatureKeys?: unknown } }>;
     expect(stored[0].data?.playbookFeatures).toEqual({ keep: true });
@@ -216,7 +229,7 @@ describe('useGame mutations', () => {
 
     // A patch built from a stale snapshot only carries the move the user toggled.
     await act(async () => {
-      await result.current.updateCharacterData('a', { typeMoves: { old: true } } as never);
+      await syncWrite(result.current.updateCharacterData('a', { typeMoves: { old: true } } as never));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Array<{ id: string; data?: { typeMoves?: Record<string, unknown> } }>;
     // The concurrently-written `keep` key survives the merge.
@@ -245,9 +258,9 @@ describe('useGame mutations', () => {
 
     // The first client's save only carries its own (still stale) view: an edit to m1.
     await act(async () => {
-      await result.current.updateCharacterData('a', {
+      await syncWrite(result.current.updateCharacterData('a', {
         arcanaMinor: [{ id: 'm1', requirementsChecked: { req1: true } }],
-      } as never);
+      } as never));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Array<{ id: string; data?: { arcanaMinor?: Array<{ id: string }> } }>;
     const ids = stored[0].data?.arcanaMinor?.map((e) => e.id);
@@ -270,9 +283,9 @@ describe('useGame mutations', () => {
     // or "this client just hasn't touched m2". Without the removal sentinel it
     // must NOT be treated as deletion.
     await act(async () => {
-      await result.current.updateCharacterData('a', {
+      await syncWrite(result.current.updateCharacterData('a', {
         arcanaMinor: [{ id: 'm1', requirementsChecked: { req1: true } }],
-      } as never);
+      } as never));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Array<{ id: string; data?: { arcanaMinor?: Array<{ id: string }> } }>;
     expect(stored[0].data?.arcanaMinor?.map((e) => e.id)).toContain('m2');
@@ -290,10 +303,10 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateCharacterData('a', {
+      await syncWrite(result.current.updateCharacterData('a', {
         arcanaMinor: [{ id: 'm1', requirementsChecked: {} }],
         removedArcanaMinorIds: ['m2'],
-      } as never);
+      } as never));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Array<{ id: string; data?: { arcanaMinor?: Array<{ id: string }>; removedArcanaMinorIds?: unknown } }>;
     expect(stored[0].data?.arcanaMinor?.map((e) => e.id)).toEqual(['m1']);
@@ -309,7 +322,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateCharacterData('a', { notes: 'hi' } as never);
+      await syncWrite(result.current.updateCharacterData('a', { notes: 'hi' } as never));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     expect(stored.find((c) => c.id === 'b')?.name).toBe('Keep Me');
@@ -329,7 +342,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateCharacterData('a', { statHp: '20' });
+      await syncWrite(result.current.updateCharacterData('a', { statHp: '20' }));
     });
     const stored = firestoreStore.get(GAME_PATH)!.characters as Character[];
     const data = stored.find((c) => c.id === 'a')?.data as Record<string, unknown>;
@@ -343,11 +356,11 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateSteading({
+      await syncWrite(result.current.updateSteading({
         improvements: { wall: true },
         // NPC array with an optional undefined field — must be stripped before write.
         residents: [{ id: 'n1', name: 'Mara', pronouns: undefined }] as never,
-      });
+      }));
     });
     const steading = firestoreStore.get(GAME_PATH)!.steading as {
       improvements?: Record<string, boolean>;
@@ -376,7 +389,7 @@ describe('useGame mutations', () => {
 
     // The player's save only carries their own (still stale) view: a rename of n1.
     await act(async () => {
-      await result.current.updateSteading({ residents: [{ id: 'n1', name: 'Mara the Wise' }] as never });
+      await syncWrite(result.current.updateSteading({ residents: [{ id: 'n1', name: 'Mara the Wise' }] as never }));
     });
     const steading = firestoreStore.get(GAME_PATH)!.steading as { residents?: Array<{ id: string; name: string }> };
     const byId = new Map(steading.residents?.map((r) => [r.id, r.name]));
@@ -393,10 +406,10 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateSteading({
+      await syncWrite(result.current.updateSteading({
         residents: [{ id: 'n1', name: 'Mara' }] as never,
         removedResidentIds: ['n2'],
-      });
+      }));
     });
     const steading = firestoreStore.get(GAME_PATH)!.steading as { residents?: Array<{ id: string }> };
     expect(steading.residents?.map((r) => r.id)).toEqual(['n1']);
@@ -408,7 +421,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateSteading({ removedFixedItems: ['Village militia'] });
+      await syncWrite(result.current.updateSteading({ removedFixedItems: ['Village militia'] }));
     });
     const steading = firestoreStore.get(GAME_PATH)!.steading as { removedFixedItems?: string[] };
     expect(steading.removedFixedItems).toEqual(['Village militia']);
@@ -427,7 +440,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateSteading({ removedFixedItems: ['Village militia'] });
+      await syncWrite(result.current.updateSteading({ removedFixedItems: ['Village militia'] }));
     });
     const steading = firestoreStore.get(GAME_PATH)!.steading as { removedFixedItems?: string[] };
     expect(steading.removedFixedItems).toEqual(
@@ -455,9 +468,9 @@ describe('useGame mutations', () => {
     });
 
     await act(async () => {
-      await result.current.updateSteading({
+      await syncWrite(result.current.updateSteading({
         gmImprovements: [{ ...gi1, completed: true }] as never,
-      });
+      }));
     });
     let steading = firestoreStore.get(GAME_PATH)!.steading as { gmImprovements?: Array<{ id: string; completed: boolean }> };
     let byId = new Map(steading.gmImprovements?.map((g) => [g.id, g.completed]));
@@ -465,17 +478,17 @@ describe('useGame mutations', () => {
     expect(byId.has('g2')).toBe(true);
 
     await act(async () => {
-      await result.current.updateSteading({
+      await syncWrite(result.current.updateSteading({
         gmImprovements: [{ ...gi1, completed: true }] as never,
         removedGmImprovementIds: ['g2'],
-      });
+      }));
     });
     steading = firestoreStore.get(GAME_PATH)!.steading as { gmImprovements?: Array<{ id: string; completed: boolean }> };
     byId = new Map(steading.gmImprovements?.map((g) => [g.id, g.completed]));
     expect(byId.has('g2')).toBe(false);
   });
 
-  it('shows the error toast and rethrows when a write fails (#210)', async () => {
+  it('rejects a new edit when the loaded game has been deleted (#210)', async () => {
     firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0, characters: [char('a')] });
     const { result } = renderGame();
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -487,13 +500,13 @@ describe('useGame mutations', () => {
       // Direct save paths only have .finally(); reportSave must surface the
       // failure itself so it isn't silent. It also rethrows, so callers that
       // retry (the debounce hook) still see the rejection.
-      await expect(result.current.updateGameName('New Name')).rejects.toThrow();
+      await expect(syncWrite(result.current.updateGameName('New Name'))).rejects.toThrow();
     });
 
-    expect(addToastSpy).toHaveBeenCalledWith(SAVE_ERROR_MESSAGE, 'error');
+    expect(result.current.game).toBeNull();
   });
 
-  it('withCharacters throws (not silently no-ops) when the game doc is gone (#254)', async () => {
+  it('rejects character edits when the game is gone (#254)', async () => {
     firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0, characters: [char('a')] });
     const { result } = renderGame();
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -503,9 +516,9 @@ describe('useGame mutations', () => {
     await act(async () => { firestoreStore.delete(GAME_PATH); });
 
     await act(async () => {
-      await expect(result.current.updateCharacterName('a', 'Renamed')).rejects.toThrow();
+      await expect(syncWrite(result.current.updateCharacterName('a', 'Renamed'))).rejects.toThrow();
     });
-    expect(addToastSpy).toHaveBeenCalledWith(SAVE_ERROR_MESSAGE, 'error');
+    expect(result.current.game).toBeNull();
   });
 
   it('surfaces the invalid-write message when a write hits invalid-argument (#254, #268)', async () => {
@@ -516,15 +529,15 @@ describe('useGame mutations', () => {
     // invalid-argument covers both an over-1MiB write and a malformed value (e.g. `undefined`
     // left in the payload by a bug) — the message can't assume which one this is (see
     // INVALID_WRITE_MESSAGE), so this only asserts the code maps to that shared message.
-    const { updateDoc } = await import('firebase/firestore');
-    (updateDoc as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+    const { runTransaction } = await import('firebase/firestore');
+    (runTransaction as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       Object.assign(new Error('maximum size'), { code: 'invalid-argument' }),
     );
 
     await act(async () => {
-      await expect(result.current.updateGameName('New Name')).rejects.toThrow();
+      await expect(syncWrite(result.current.updateGameName('New Name'))).rejects.toThrow();
     });
-    expect(addToastSpy).toHaveBeenCalledWith(INVALID_WRITE_MESSAGE, 'error');
+    expect(getGameSync('g1').getSnapshot().queue.error).toBe(INVALID_WRITE_MESSAGE);
   });
 
   it('updateSteading validates debility booleans pass through as written', async () => {
@@ -533,7 +546,7 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateSteading({ defenses: 3 });
+      await syncWrite(result.current.updateSteading({ defenses: 3 }));
     });
     expect((firestoreStore.get(GAME_PATH)!.steading as { defenses?: number }).defenses).toBe(3);
   });
@@ -547,9 +560,9 @@ describe('useGame mutations', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.updateSteading({
+      await syncWrite(result.current.updateSteading({
         debilities: { diminished: false, lacking: undefined, malcontent: undefined } as never,
-      });
+      }));
     });
     const steading = firestoreStore.get(GAME_PATH)!.steading as { debilities?: Record<string, unknown> };
     expect(steading.debilities).toEqual({ diminished: false });
@@ -565,7 +578,7 @@ describe('useGame mutations', () => {
     // A resource roll carries stat 'nothing', so the resource name is the only thing that tells
     // the shared log what the modifier stood for — it has to survive the write and the read back.
     await act(async () => {
-      await result.current.logRoll(roll('r1', { stat: 'nothing', resource: 'Prosperity', mod: 2 }));
+      await syncWrite(result.current.logRoll(roll('r1', { stat: 'nothing', resource: 'Prosperity', mod: 2 })));
     });
 
     await waitFor(() => expect(result.current.game?.diceRolls).toHaveLength(1));
@@ -580,7 +593,7 @@ describe('useGame mutations', () => {
     // CharacterPlaybook always maps `resource: report.resource`, which is undefined for a stat
     // roll — real Firestore rejects the whole write if that key survives to the payload.
     await act(async () => {
-      await result.current.logRoll({ ...roll('r1'), resource: undefined });
+      await syncWrite(result.current.logRoll({ ...roll('r1'), resource: undefined }));
     });
 
     const stored = firestoreStore.get(GAME_PATH)!.diceRolls as Record<string, unknown>[];
@@ -601,7 +614,7 @@ describe('useGame mutations', () => {
       });
     });
 
-    await act(async () => { await result.current.logRoll(roll('mine', { createdAt: 9 })); });
+    await act(async () => { await syncWrite(result.current.logRoll(roll('mine', { createdAt: 9 }))); });
 
     const stored = firestoreStore.get(GAME_PATH)!.diceRolls as LoggedRoll[];
     expect(stored.map((r) => r.id)).toEqual(['theirs', 'mine']);
@@ -613,7 +626,7 @@ describe('useGame mutations', () => {
     const { result } = renderGame();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => { await result.current.logRoll(roll('newest', { createdAt: 99 })); });
+    await act(async () => { await syncWrite(result.current.logRoll(roll('newest', { createdAt: 99 }))); });
 
     const stored = firestoreStore.get(GAME_PATH)!.diceRolls as LoggedRoll[];
     expect(stored).toHaveLength(50);
@@ -687,6 +700,7 @@ describe('useGame mutations', () => {
     it('refreshNotesLock re-stamps only a lock this tab holds', async () => {
       const result = await loaded({ notesLocks: { gm: { clientId: NOTES_CLIENT_ID, at: 1 }, steading: { clientId: 'other-tab', at: 1 } } });
       await act(async () => {
+        await result.current.claimNotesLock('gm');
         await result.current.refreshNotesLock('gm');
         await result.current.refreshNotesLock('steading');
         await result.current.refreshNotesLock('missing');
@@ -698,34 +712,36 @@ describe('useGame mutations', () => {
 
     it('releaseNotesLock saves the content and clears this tab\'s lock in one write', async () => {
       const result = await loaded({ notes: { steading: '<p>keep</p>' }, notesLocks: { gm: { clientId: NOTES_CLIENT_ID, at: 1 } } });
-      await act(async () => { await result.current.releaseNotesLock('gm', '<p>hello</p>'); });
+      await act(async () => { await result.current.claimNotesLock('gm'); });
+      await act(async () => { await syncWrite(result.current.releaseNotesLock('gm', '<p>hello</p>')); });
       expect(notes()).toEqual({ steading: '<p>keep</p>', gm: '<p>hello</p>' });
       expect(locks()?.gm).toBeNull();
       await waitFor(() => expect(result.current.game?.notesLocks?.gm).toBeUndefined());
       expect(result.current.game?.notes?.gm).toBe('<p>hello</p>');
     });
 
-    it('releaseNotesLock still saves, but keeps a lock another tab has since taken', async () => {
-      const theirs = { clientId: 'other-tab', at: 5 };
+    it('preserves the draft and refuses to overwrite a newer notes holder', async () => {
+      const theirs = { clientId: 'other-tab', token: 'new-hold', at: Date.now() };
       const result = await loaded({ notesLocks: { gm: theirs } });
-      await act(async () => { await result.current.releaseNotesLock('gm', '<p>mine</p>'); });
-      expect(notes()?.gm).toBe('<p>mine</p>');
+      await act(async () => { await expect(syncWrite(result.current.releaseNotesLock('gm', '<p>mine</p>'))).rejects.toThrow(); });
+      expect(notes()?.gm).toBeUndefined();
+      expect(getGameSync('g1').getSnapshot().queue.conflict?.changes[0].after).toBe('<p>mine</p>');
       expect(locks()?.gm).toEqual(theirs);
     });
 
     it('updateNotes writes one key without touching the others', async () => {
       const result = await loaded({ notes: { gm: '<p>gm</p>' } });
-      await act(async () => { await result.current.updateNotes('char-1', '<p>char</p>'); });
+      await act(async () => { await syncWrite(result.current.updateNotes('char-1', '<p>char</p>')); });
       expect(notes()).toEqual({ gm: '<p>gm</p>', 'char-1': '<p>char</p>' });
     });
 
-    it('a failed release surfaces the save-error toast', async () => {
+    it('rejects a release when the game has disappeared', async () => {
       const result = await loaded();
       await act(async () => { firestoreStore.delete(GAME_PATH); });
       await act(async () => {
-        await expect(result.current.releaseNotesLock('gm', '<p>x</p>')).rejects.toThrow();
+        await expect(syncWrite(result.current.releaseNotesLock('gm', '<p>x</p>'))).rejects.toThrow();
       });
-      expect(addToastSpy).toHaveBeenCalledWith(SAVE_ERROR_MESSAGE, 'error');
+      expect(result.current.game).toBeNull();
     });
 
     it('drops malformed notes and locks when parsing', async () => {

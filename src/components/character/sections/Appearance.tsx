@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useLatest } from '@/hooks/useLatest';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { useCollapsibleSection } from '@/hooks/useCollapsibleSection';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { useCharacterField } from '@/hooks/useCharacterField';
 import { Checkbox, Input, Radio, RadioGroup, Text } from '@/components/ui';
 import { useToast } from '@/components/app';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
@@ -15,7 +15,7 @@ const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 interface AppearanceProps {
   rows?: AppearanceRows;
   data?: CharacterData;
-  onSave?: (data: Partial<CharacterData>) => Promise<void>;
+  onSave?: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
 }
 
 export const Appearance = ({ rows, data, onSave }: AppearanceProps = {}) => {
@@ -25,15 +25,15 @@ export const Appearance = ({ rows, data, onSave }: AppearanceProps = {}) => {
   const [customText, setCustomText] = useState<string>(data?.appearanceCustom ?? '');
   const customTextRef = useLatest(customText);
 
-  // appearance and appearanceCustom are always written together.
-  const { value: selected, ref: selectedRef, save: saveSelected, pendingRef: appearancePendingRef } = useOptimisticField(
-    data?.appearance ?? {},
-    (next) => onSaveRef.current?.({ appearance: next, appearanceCustom: customTextRef.current }) ?? Promise.resolve(),
+  const savePatch = useCallback((patch: Partial<CharacterData>, base?: Partial<CharacterData>) =>
+    onSave?.(patch, base) ?? Promise.resolve(), [onSave]);
+  const { value: selected, ref: selectedRef, save: saveSelected, pendingRef: appearancePendingRef } = useCharacterField(
+    'appearance', data?.appearance ?? {}, savePatch,
     'Failed to save appearance.',
   );
 
   const saveCustomText = (value: string) =>
-    onSaveRef.current?.({ appearance: selectedRef.current, appearanceCustom: value }) ?? Promise.resolve();
+    onSaveRef.current?.({ appearanceCustom: value }) ?? Promise.resolve();
   const { onChange: debouncedCustomChange, flush: flushCustomOnBlur } = useDebouncedSave(saveCustomText, 1000);
 
   const isCompleteInit = Boolean(data?.appearanceCustom) ||
@@ -48,22 +48,14 @@ export const Appearance = ({ rows, data, onSave }: AppearanceProps = {}) => {
 
   const handleCustomToggle = useCallback(() => {
     const prevCustom = customTextRef.current;
-    setIsCustom((prev) => {
-      const next = !prev;
-      appearancePendingRef.current = true;
-      if (!next) {
-        setCustomText('');
-        onSaveRef.current?.({ appearance: selectedRef.current, appearanceCustom: '' })
-          .catch(() => { setIsCustom(true); setCustomText(prevCustom); addToast('Failed to save appearance.', 'error'); })
-          .finally(() => { appearancePendingRef.current = false; });
-      } else {
-        onSaveRef.current?.({ appearance: selectedRef.current, appearanceCustom: prevCustom })
-          .catch(() => { setIsCustom(false); addToast('Failed to save appearance.', 'error'); })
-          .finally(() => { appearancePendingRef.current = false; });
-      }
-      return next;
-    });
-  }, [addToast, appearancePendingRef, customTextRef, onSaveRef, selectedRef]);
+    const next = !isCustom;
+    setIsCustom(next);
+    appearancePendingRef.current = true;
+    if (!next) setCustomText('');
+    onSaveRef.current?.({ appearanceCustom: next ? prevCustom : '' })
+      .catch(() => { addToast('Could not preserve appearance. Keep this page open and retry.', 'error'); })
+      .finally(() => { appearancePendingRef.current = false; });
+  }, [isCustom, addToast, appearancePendingRef, customTextRef, onSaveRef]);
 
   const handleCustomChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;

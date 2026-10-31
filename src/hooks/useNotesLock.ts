@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatest } from './useLatest';
 import { NOTES_CLIENT_ID, NOTES_HEARTBEAT_MS, NOTES_IDLE_MS, NOTES_STALE_MS } from '@/lib/sharedNotes';
 import type { NotesLock } from '@/types';
+import { useGameSyncOptional } from '@/components/app/SaveStatus/GameSyncContext';
 
 interface UseNotesLockArgs {
   // This notes key's lock as last seen in the game snapshot.
@@ -12,15 +13,16 @@ interface UseNotesLockArgs {
   refresh: () => Promise<void>;
   release: (html: string) => Promise<void>;
   save: (html: string) => Promise<void>;
-  // Another tab won the lock before this one — discard the keystroke(s) that tried to claim it.
+  // Show that exclusive editing could not be acquired; never discard the draft.
   onClaimRejected: () => void;
 }
 
 // Lifecycle of this tab's hold on the lock. 'claiming' covers the transaction round-trip after the first
-// keystroke; typing continues locally meanwhile and is kept only if the claim succeeds.
+// keystroke; typing is preserved locally even if the claim fails.
 type Hold = 'idle' | 'claiming' | 'held';
 
 export const useNotesLock = ({ lock, getHtml, claim, refresh, release, save, onClaimRejected }: UseNotesLockArgs) => {
+  const durable = !!useGameSyncOptional();
   const latest = useLatest({ getHtml, claim, refresh, release, save, onClaimRejected });
   const holdRef = useRef<Hold>('idle');
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,8 +46,7 @@ export const useNotesLock = ({ lock, getHtml, claim, refresh, release, save, onC
   const track = useCallback((write: Promise<void>, onError?: () => void) => {
     inFlightRef.current += 1;
     write
-      // Failures are already surfaced by useGame's reportSave toast; the heartbeat has no onError and is
-      // best-effort by design.
+      // The durable save status surfaces failures. Heartbeats are best-effort.
       .catch(() => onError?.())
       .finally(() => { inFlightRef.current -= 1; });
   }, []);
@@ -64,7 +65,6 @@ export const useNotesLock = ({ lock, getHtml, claim, refresh, release, save, onC
 
   const rejectClaim = useCallback(() => {
     holdRef.current = 'idle';
-    dirtyRef.current = false;
     if (idleTimerRef.current) {
       clearTimeout(idleTimerRef.current);
       idleTimerRef.current = null;
@@ -75,6 +75,9 @@ export const useNotesLock = ({ lock, getHtml, claim, refresh, release, save, onC
   // Wire to the editor's content-change event (not selection changes).
   const noteChange = useCallback(() => {
     dirtyRef.current = true;
+    // Durable local acceptance happens on every change, independently of lock
+    // acquisition and server availability. GameSync owns network debouncing.
+    track(latest.current.save(latest.current.getHtml()), () => { dirtyRef.current = true; });
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
       idleTimerRef.current = null;
@@ -108,10 +111,12 @@ export const useNotesLock = ({ lock, getHtml, claim, refresh, release, save, onC
     track(latest.current.save(latest.current.getHtml()), () => { dirtyRef.current = true; });
   }, [latest, track]);
 
-  // True while applying a remote value could clobber local work: mid-edit, mid-write, or holding unsaved text.
+  // GameSync projects every local edit before publishing its snapshot. Accept
+  // that projection, including an explicit "keep shared" conflict resolution.
+  // Standalone callers still need the legacy editor-level hold.
   const isBusy = useCallback(
-    () => holdRef.current !== 'idle' || inFlightRef.current > 0 || dirtyRef.current,
-    [],
+    () => !durable && (holdRef.current !== 'idle' || inFlightRef.current > 0 || dirtyRef.current),
+    [durable],
   );
 
   // Timers don't survive a closed tab or a backgrounded mobile app, so save and release right away rather

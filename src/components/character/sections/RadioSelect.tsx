@@ -10,7 +10,7 @@ interface RadioSelectProps {
   instruction?: ReactNode;
   options?: RadioOption[];
   data?: CharacterData;
-  onSave?: (data: Partial<CharacterData>) => Promise<void>;
+  onSave?: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   overrideNote?: string;
   chooseNote?: string;
   dataKey?: keyof CharacterData;

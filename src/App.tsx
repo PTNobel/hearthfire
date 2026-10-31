@@ -4,6 +4,7 @@ import { ToastProvider, SaveStatusProvider, ErrorBoundary } from "@/components/a
 import { Spinner } from "@/components/ui";
 import { SessionRoute } from '@/components/app/SessionRoute';
 import styles from "./App.module.css";
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 /*
  * Each page is lazy-loaded — its JS bundle is only fetched the first time
@@ -54,6 +55,7 @@ const NotFound = lazy(() =>
  * PageLayout / PageHeader, so no shared shell wrapper is needed here.
  */
 export const App = () => {
+  useColorScheme();
   // Key the boundary to the route path so a render error on one page clears
   // when the user navigates elsewhere, instead of blanking the app until reload.
   const { pathname } = useLocation();

@@ -6,8 +6,7 @@ import { useCrewSave } from '../useCrewSave';
 const PATCH = { animalTypeCustom: { 'type-a': 'first' } };
 const LATER_PATCH = { animalTypeCustom: { 'type-a': 'second' } };
 
-// useCrewSave owns a 1000ms debounce and mounts no ToastProvider, so fake timers
-// are safe here — advance them explicitly instead of polling with waitFor.
+// Local acceptance is immediate; advancing timers must not trigger another write.
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -18,10 +17,10 @@ describe('useCrewSave — how a failed write reaches the caller', () => {
     const { result } = renderHook(() => useCrewSave(undefined, onSave));
 
     act(() => { result.current.saveDebounced(PATCH, onError); });
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: PATCH }, undefined);
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: PATCH });
+    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: PATCH }, undefined);
     expect(onError).toHaveBeenCalled();
   });
 
@@ -46,20 +45,20 @@ describe('useCrewSave — how a failed write reaches the caller', () => {
     const { result } = renderHook(() => useCrewSave(undefined, onSave));
     const caught = vi.fn();
 
-    // flushDebounce only writes when a debounce is actually outstanding.
+    // A blur submits its current value without waiting for an earlier acceptance.
     act(() => { result.current.saveDebounced(PATCH); });
     await act(async () => { await result.current.flushDebounce(LATER_PATCH).catch(caught); });
 
     // The blur payload wins — it carries whatever the field held at blur time.
-    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: LATER_PATCH });
+    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: LATER_PATCH }, undefined);
     expect(caught).toHaveBeenCalled();
   });
 
-  it('resolves flushDebounce without writing when nothing is outstanding', async () => {
+  it('accepts a blur value even without an earlier change event', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useCrewSave(undefined, onSave));
 
     await act(async () => { await result.current.flushDebounce(PATCH); });
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: PATCH }, undefined);
   });
 });

@@ -32,16 +32,16 @@ describe('usePlaybookChecked', () => {
     expect(result.current.checked).toEqual({ a: true, b: true });
     // featurePatch emits only the changed key so useGame's transaction can deep-merge
     // against the freshly-read doc instead of clobbering it with a stale snapshot.
-    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: { marshalWarStories: { a: true, b: true } } });
+    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: { marshalWarStories: { a: true, b: true } } }, { playbookFeatures: { marshalWarStories: { a: true } } });
   });
 
-  it('rolls back the toggle when the save rejects', async () => {
+  it('retains the toggle when local acceptance fails', async () => {
     const data = dataWith({ marshalWarStories: { a: true } });
     const onSave = vi.fn().mockRejectedValue(new Error('network'));
     const { result } = renderHook(() => usePlaybookChecked(data, onSave, 'marshalWarStories'));
 
     await act(async () => { result.current.handleChange('a', false); });
-    expect(result.current.checked).toEqual({ a: true });
+    expect(result.current.checked).toEqual({ a: false });
   });
 
   it('ignores an incoming data sync while a save is pending (no double-clobber)', async () => {
@@ -89,7 +89,7 @@ describe('usePlaybookCheckedWithAnswers', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
-  it('debounces answer saves and saves the latest value', async () => {
+  it('submits every answer revision for durable acceptance', async () => {
     const data = dataWith({ marshalWarStories: {}, marshalWarStoriesAnswers: {} });
     const onSave = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(
@@ -98,11 +98,11 @@ describe('usePlaybookCheckedWithAnswers', () => {
 
     act(() => { result.current.handleAnswer('q1', 'partial'); });
     act(() => { result.current.handleAnswer('q1', 'final'); });
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onSave).toHaveBeenCalledTimes(2);
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: { marshalWarStoriesAnswers: { q1: 'final' } } });
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave).toHaveBeenCalledWith({ playbookFeatures: { marshalWarStoriesAnswers: { q1: 'final' } } }, { playbookFeatures: { marshalWarStoriesAnswers: { q1: 'partial' } } });
   });
 
   it('flushes pending answers immediately on flushAnswers', async () => {
@@ -118,7 +118,7 @@ describe('usePlaybookCheckedWithAnswers', () => {
     await act(async () => { result.current.flushAnswers(); });
     expect(onSave).toHaveBeenCalledWith({
       playbookFeatures: { marshalWarStoriesAnswers: { q1: 'now' } },
-    });
+    }, { playbookFeatures: { marshalWarStoriesAnswers: {} } });
   });
 
   it('prevents a double save by deduping repeated identical checkbox toggles', async () => {
@@ -132,6 +132,6 @@ describe('usePlaybookCheckedWithAnswers', () => {
     expect(result.current.checked).toEqual({ a: true });
     expect(onSave).toHaveBeenCalledWith({
       playbookFeatures: { marshalWarStories: { a: true } },
-    });
+    }, { playbookFeatures: { marshalWarStories: {} } });
   });
 });
