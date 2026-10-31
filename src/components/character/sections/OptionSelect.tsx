@@ -117,7 +117,7 @@ export const OptionSelect = ({
 
   const handleCustomBlur = useCallback(() => {
     flushOnBlur(customTextRef.current);
-  }, [flushOnBlur]);
+  }, [flushOnBlur, customTextRef]);
 
   if (!options) return <PlaybookSection title={title} overrideNote={overrideNote} />;
   if (overrideNote) return <PlaybookSection title={title} overrideNote={overrideNote} />;

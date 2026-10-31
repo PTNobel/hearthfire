@@ -230,7 +230,7 @@ export const SpecialPossessions = ({ config, data, onSave, level = 1, chooseOver
 
   const handleToggle = useCallback((id: string, checked: boolean) => {
     saveSelected({ ...selectedRef.current, [id]: checked });
-  }, [saveSelected]);
+  }, [saveSelected, selectedRef]);
 
   const handleRadioSelect = useCallback((possessionId: string, key: string) => {
     const prev = selectedRef.current;
@@ -240,15 +240,15 @@ export const SpecialPossessions = ({ config, data, onSave, level = 1, chooseOver
     }
     next[key] = true;
     saveSelected(next);
-  }, [saveSelected]);
+  }, [saveSelected, selectedRef]);
 
   const handleUses = useCallback((id: string, count: number) => {
     saveUses({ ...usesRef.current, [id]: count });
-  }, [saveUses]);
+  }, [saveUses, usesRef]);
 
   const handleStock = useCallback((stockKey: Extract<keyof CharacterData, 'sacredPouchStock' | 'herbGardenStock'>, stock: number) => {
     onSaveRef.current?.({ [stockKey]: stock })?.catch(() => addToast('Failed to save.', 'error'));
-  }, [addToast]);
+  }, [addToast, onSaveRef]);
 
   const stockExtras = useMemo(() => {
     const map: Record<string, React.ReactNode> = {};
