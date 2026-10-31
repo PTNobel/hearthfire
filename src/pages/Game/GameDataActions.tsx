@@ -42,7 +42,7 @@ export const GameDataActions = ({ gameId, gameName, onReplaceGameData }: GameDat
       addToast(
         error instanceof UnsyncedBackupError
           ? error.message
-          : "Couldn't export the latest server data — check your connection and try again.",
+          : "Couldn't export this game — current server data is unavailable. Check your connection and try again.",
         'error',
       );
     } finally {
