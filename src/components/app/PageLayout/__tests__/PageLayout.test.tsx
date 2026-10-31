@@ -5,7 +5,7 @@ import { PageLayout } from '../PageLayout';
 
 const diceRoller = { rollerId: 'gm', rollerName: 'GM', onRoll: vi.fn().mockResolvedValue(undefined) };
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => vi.stubEnv('VITE_MIRO_BOARD_URL', ''));
 
 describe('PageLayout dice roller', () => {
   it('mounts the roller when the page passes diceRoller', () => {
