@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Modal } from '../Modal';
+import { useState } from 'react';
 
 // Modal reads #root to apply `inert` to the rest of the app while open, and
 // restores focus to whatever was focused before it opened. Both behaviors need a
@@ -27,6 +28,53 @@ const Dialog = ({ open, onClose }: { open: boolean; onClose: () => void }) => (
 );
 
 describe('Modal', () => {
+  it('Escape closes only the top dialog and restores focus to the dialog underneath', async () => {
+    const Stacked = () => {
+      const [lower, setLower] = useState(true);
+      const [upper, setUpper] = useState(false);
+      return <>
+        <Modal open={lower} onClose={() => setLower(false)} aria-labelledby="lower-title">
+          <h2 id="lower-title">Lower</h2>
+          <button onClick={() => setUpper(true)}>Open confirmation</button>
+        </Modal>
+        <Modal open={upper} onClose={() => setUpper(false)} aria-labelledby="upper-title">
+          <h2 id="upper-title">Upper</h2>
+          <button>Confirm</button>
+        </Modal>
+      </>;
+    };
+    render(<Stacked />);
+    const lower = screen.getByRole('dialog', { name: 'Lower' });
+    const trigger = screen.getByRole('button', { name: 'Open confirmation' });
+    await userEvent.click(trigger);
+    expect(lower.parentElement).toHaveAttribute('inert');
+    expect(screen.getByRole('dialog', { name: 'Upper' })).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Upper' })).not.toBeInTheDocument();
+    expect(lower).toBeInTheDocument();
+    expect(lower.parentElement).not.toHaveAttribute('inert');
+    expect(root).toHaveAttribute('inert');
+    expect(trigger).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    expect(root).not.toHaveAttribute('inert');
+  });
+
+  it('keeps the app inert and scroll locked if a lower dialog unmounts first', () => {
+    const Pair = ({ lower }: { lower: boolean }) => <>
+      <Modal open={lower} onClose={vi.fn()} aria-labelledby="lower-title"><h2 id="lower-title">Lower</h2></Modal>
+      <Modal open onClose={vi.fn()} aria-labelledby="upper-title"><h2 id="upper-title">Upper</h2></Modal>
+    </>;
+    const previousOverflow = document.body.style.overflow;
+    const { rerender, unmount } = render(<Pair lower />);
+    rerender(<Pair lower={false} />);
+    expect(root).toHaveAttribute('inert');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(screen.getByRole('dialog', { name: 'Upper' })).toHaveFocus();
+    unmount();
+    expect(root).not.toHaveAttribute('inert');
+    expect(document.body.style.overflow).toBe(previousOverflow);
+  });
+
   it('renders nothing when closed', () => {
     render(<Dialog open={false} onClose={vi.fn()} />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

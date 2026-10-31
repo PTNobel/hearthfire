@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Button } from '@/components/ui';
 import { Icon } from '@/components/ui';
 import { Text } from '@/components/ui';
+import { useActiveNotificationTarget } from '@/hooks/useNotificationTarget';
 import { generateId } from '@/lib/id';
 import { ToastContext, type ToastVariant } from './ToastContext';
 import styles from './Toast.module.css';
@@ -66,6 +67,7 @@ const ToastEntry = ({
 };
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
+  const notificationTarget = useActiveNotificationTarget();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   // Persistent polite announcement — mounted once up front (not per-toast) so
   // screen readers pick it up. A live region added to the DOM together with its
@@ -76,13 +78,18 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   // Dedupe key (`variant:message`) per visible toast id, so repeated identical
   // notifications (e.g. one failed save per field while offline) don't stack.
   const visibleKeys = useRef<Map<string, string>>(new Map());
+  const pausedIds = useRef(new Set<string>());
+  const exitingIds = useRef(new Set<string>());
 
   const startExit = useCallback((id: string) => {
-    visibleKeys.current.delete(id);
+    exitingIds.current.add(id);
     setToasts((prev) => prev.map((t) => t.id === id ? { ...t, exiting: true } : t));
     const removeTimer = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
       timers.current.delete(id);
+      visibleKeys.current.delete(id);
+      pausedIds.current.delete(id);
+      exitingIds.current.delete(id);
     }, EXIT_DURATION_MS);
     timers.current.set(id, removeTimer);
   }, []);
@@ -95,7 +102,12 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         // warning stays up while the condition persists, without stacking.
         const existingTimer = timers.current.get(existingId);
         if (existingTimer) clearTimeout(existingTimer);
-        timers.current.set(existingId, setTimeout(() => startExit(existingId), AUTO_DISMISS_MS));
+        if (exitingIds.current.delete(existingId)) {
+          setToasts((prev) => prev.map((t) => t.id === existingId ? { ...t, exiting: false } : t));
+        }
+        if (!pausedIds.current.has(existingId)) {
+          timers.current.set(existingId, setTimeout(() => startExit(existingId), AUTO_DISMISS_MS));
+        }
         return;
       }
     }
@@ -123,22 +135,30 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   // focuses a toast so it can't vanish mid-read; resume with a fresh timer.
   const pauseToast = useCallback((id: string) => {
     // Don't touch the timer of a toast that's already exiting — once startExit
-    // runs it deletes the key here, and the timer under this id is its removal
+    // runs it marks the id as exiting, and the timer under this id is its removal
     // timer. Clearing that would strand the toast in the DOM forever.
-    if (!visibleKeys.current.has(id)) return;
+    if (!visibleKeys.current.has(id) || exitingIds.current.has(id)) return;
+    pausedIds.current.add(id);
     const existing = timers.current.get(id);
     if (existing) clearTimeout(existing);
   }, []);
 
   const resumeToast = useCallback((id: string) => {
     // Only restart for toasts that are still visible (not already exiting).
-    if (!visibleKeys.current.has(id)) return;
+    if (!visibleKeys.current.has(id) || exitingIds.current.has(id)) return;
+    pausedIds.current.delete(id);
     // Clear any existing timer first so rapid focus/blur can't leave concurrent
     // timeouts racing to dismiss the same toast.
     const existing = timers.current.get(id);
     if (existing) clearTimeout(existing);
     timers.current.set(id, setTimeout(() => startExit(id), AUTO_DISMISS_MS));
   }, [startExit]);
+
+  useEffect(() => {
+    // Moving a portal replaces its DOM nodes without a mouseleave/blur event.
+    // Release their old hover/focus pauses so notifications cannot get stuck.
+    pausedIds.current.forEach(resumeToast);
+  }, [notificationTarget, resumeToast]);
 
   useEffect(() => {
     const savedTimers = timers.current;
@@ -148,6 +168,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   // Stable context value — every saving component subscribes to this context,
   // so a fresh object here would redraw them all whenever a toast comes or goes.
   const contextValue = useMemo(() => ({ addToast }), [addToast]);
+  const regionCx = clsx(styles.region, notificationTarget && styles.inline);
 
   return (
     <ToastContext.Provider value={contextValue}>
@@ -157,7 +178,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
           <div role="status" aria-live="polite" aria-atomic="true" className={styles.announcer}>
             {announcement}
           </div>
-          <div role="region" className={styles.region} aria-label="Notifications">
+          <div role="region" className={regionCx} aria-label="Notifications">
             {toasts.map((item) => (
               <ToastEntry
                 key={item.id}
@@ -169,7 +190,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             ))}
           </div>
         </>,
-        document.body
+        notificationTarget ?? document.body
       )}
     </ToastContext.Provider>
   );

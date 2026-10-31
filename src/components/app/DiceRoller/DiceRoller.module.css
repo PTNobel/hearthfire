@@ -241,3 +241,7 @@
   font-weight: 700;
   color: var(--text-accent);
 }
+
+.notifications {
+  display: contents;
+}

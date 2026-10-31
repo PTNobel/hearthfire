@@ -1,5 +1,6 @@
-import { useRef, useCallback, useEffect, useState, useInsertionEffect, type MutableRefObject } from 'react';
+import { useRef, useCallback, useEffect, useState, useInsertionEffect, useId, type MutableRefObject } from 'react';
 import { useToastOptional } from '@/components/app/Toast/ToastContext';
+import { useSaveStatusActionsOptional } from '@/components/app/SaveStatus/SaveStatusContext';
 import { useLatest } from './useLatest';
 import { INVALID_WRITE_MESSAGE, SAVE_ERROR_MESSAGE } from '@/lib/constants';
 
@@ -48,6 +49,9 @@ export const useDebouncedSave = <T>(
   const onSaveRef = useLatest(onSave);
   const onErrorRef = useLatest(onError);
   const onSuccessRef = useLatest(onSuccess);
+  const revisionRef = useRef(0);
+  const draftId = useId();
+  const statusRef = useLatest(useSaveStatusActionsOptional());
 
   const addToast = useToastOptional()?.addToast;
 
@@ -57,12 +61,14 @@ export const useDebouncedSave = <T>(
   const setPending = useCallback((value: boolean) => {
     isPendingRef.current = value;
     setIsPending(value);
-  }, []);
+    statusRef.current?.reportDraft(draftId, value);
+  }, [draftId, statusRef]);
 
   // Lets the retry timer call the latest save without a circular useCallback dependency.
   const saveRef = useRef<(value: T) => Promise<void>>(() => Promise.resolve());
 
   const save = useCallback((value: T): Promise<void> => {
+    const revision = revisionRef.current;
     queuedRef.current = null;
     // Any new save supersedes a scheduled retry — its payload reflects newer state.
     if (retryTimerRef.current) {
@@ -74,7 +80,11 @@ export const useDebouncedSave = <T>(
       const key = JSON.stringify(value);
       // Already persisted — skip the write, but still report success so callers
       // can release ownership of fields a redundant flush re-submitted.
-      if (key === lastSavedRef.current) { onSuccessRef.current?.(value); return; }
+      if (key === lastSavedRef.current) {
+        failedKeyRef.current = null;
+        onSuccessRef.current?.(value);
+        return;
+      }
       try {
         await onSaveRef.current(value);
         // Only mark saved on success — after a failure, the next flush/change
@@ -83,7 +93,6 @@ export const useDebouncedSave = <T>(
         onSuccessRef.current?.(value);
         if (failedKeyRef.current !== null) {
           failedKeyRef.current = null;
-          if (!onErrorRef.current) addToast?.('Changes saved.', 'success');
         }
       } catch (error) {
         const isFirstFailure = failedKeyRef.current !== key;
@@ -93,8 +102,11 @@ export const useDebouncedSave = <T>(
         // strings match the ones useGame's reportSave emits, so the Toast dedupe collapses the
         // two paths to one.
         else addToast?.(isInvalidWrite(error) ? INVALID_WRITE_MESSAGE : SAVE_ERROR_MESSAGE, 'error');
-        if (isFirstFailure) {
-          retryTimerRef.current = setTimeout(() => { void saveRef.current(value); }, RETRY_DELAY_MS);
+        if (isFirstFailure && revision === revisionRef.current) {
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null;
+            if (revision === revisionRef.current) void saveRef.current(value);
+          }, RETRY_DELAY_MS);
         }
       }
     }).finally(() => {
@@ -102,7 +114,7 @@ export const useDebouncedSave = <T>(
       // A newer edit may already be queued on the debounce timer, not yet handed
       // to save() — pending must stay true through it, or useFirestoreSync will
       // apply a stale echo of the write that just resolved and clobber it.
-      if (activeSavesRef.current === 0 && queuedRef.current === null) setPending(false);
+      if (activeSavesRef.current === 0 && queuedRef.current === null && failedKeyRef.current === null) setPending(false);
     });
     chainRef.current = run;
     return run;
@@ -126,6 +138,12 @@ export const useDebouncedSave = <T>(
   }, []);
 
   const onChange = useCallback((value: T) => {
+    revisionRef.current += 1;
+    // Cancel as soon as the user types, not when the next debounce fires.
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     if (JSON.stringify(value) !== lastSavedRef.current) setPending(true);
     queuedRef.current = { value };
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -133,6 +151,7 @@ export const useDebouncedSave = <T>(
   }, [save, delay, setPending]);
 
   const flush = useCallback((value: T) => {
+    revisionRef.current += 1;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (JSON.stringify(value) !== lastSavedRef.current) setPending(true);
     return save(value);

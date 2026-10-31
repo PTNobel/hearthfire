@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import { ToastProvider, SaveStatusProvider, SaveStatus, ErrorBoundary } from "@/components/app";
+import { ToastProvider, SaveStatusProvider, ErrorBoundary } from "@/components/app";
 import { Spinner } from "@/components/ui";
 import { SessionRoute } from '@/components/app/SessionRoute';
 import styles from "./App.module.css";
@@ -80,9 +80,6 @@ export const App = () => {
         </Routes>
       </Suspense>
     </ErrorBoundary>
-    {/* Fixed-position save indicator — outside the route boundary so a page
-        crash doesn't remove it, inside the provider so it can read status. */}
-    <SaveStatus />
     </SaveStatusProvider>
   </ToastProvider>
   );

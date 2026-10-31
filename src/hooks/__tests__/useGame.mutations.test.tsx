@@ -64,6 +64,7 @@ describe('useGame mutations', () => {
     onRender.mockClear();
     act(() => { result.current.reportSaveStart(); });
     act(() => { result.current.reportSaveSettled(true); });
+    act(() => { result.current.reportDraft('test-field', true); });
     expect(result.current.status).toBe('saved');
     expect(onRender).not.toHaveBeenCalled();
   });

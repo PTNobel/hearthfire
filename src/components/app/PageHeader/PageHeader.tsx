@@ -10,6 +10,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/app";
 import { PageNav } from "./PageNav";
+import { SaveStatus } from '@/components/app/SaveStatus/SaveStatus';
 import { ThemeToggle } from "./ThemeToggle";
 import type { GameNav } from "./gameNav";
 import { SiteBanner } from "@/components/app/SiteBanner/SiteBanner";
@@ -267,7 +268,10 @@ export const PageHeader = (props: Props) => {
           <Heading as="h1" size="md" className={styles.wordmark}>
             <Link to="/" className={styles.wordmarkLink}>Hearthfire</Link>
           </Heading>
-          <ThemeToggle />
+          <div className={styles.statusActions}>
+            <SaveStatus />
+            <ThemeToggle />
+          </div>
         </div>
       )}
 

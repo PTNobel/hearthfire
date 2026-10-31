@@ -5,7 +5,11 @@
 .region {
   position: fixed;
   bottom: var(--spacing-6);
-  right: var(--spacing-6);
+  left: max(var(--spacing-4), env(safe-area-inset-left));
+  right: calc(var(--spacing-8) + 44px + var(--spacing-3));
+  max-width: 360px;
+  max-height: 40dvh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2);
@@ -109,3 +113,21 @@
     opacity: 0;
   }
 }
+
+.region.inline {
+  position: static;
+  max-width: none;
+  max-height: 30dvh;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.inline .toast {
+  max-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast.exiting { animation: none; }
+}
+
+.region:empty { display: none; }

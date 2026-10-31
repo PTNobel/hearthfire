@@ -1,88 +1,76 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { SaveStatusProvider } from '../SaveStatusProvider';
 import { SaveStatus } from '../SaveStatus';
 import { useSaveStatus } from '../SaveStatusContext';
 
-// A tiny consumer that lets the test drive the provider the way useGame does.
 let api: ReturnType<typeof useSaveStatus>;
 const Capture = () => {
-  // Test harness: capture the hook's return into a module variable so the test
-  // can drive the provider. Assigning an outer variable from render is fine here
-  // because this component exists only to expose the context to the test.
+  // Test harness exposes the context for driving write events.
   // eslint-disable-next-line react-hooks/globals
   api = useSaveStatus();
   return null;
 };
-
-const renderWithProvider = () =>
-  render(
-    <SaveStatusProvider>
-      <SaveStatus />
-      <Capture />
-    </SaveStatusProvider>,
-  );
+const renderWithProvider = () => render(
+  <SaveStatusProvider><SaveStatus /><Capture /></SaveStatusProvider>,
+);
+afterEach(() => vi.restoreAllMocks());
 
 describe('SaveStatus', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-06-25T12:00:00Z'));
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('rolls the relative time forward on its own timer', () => {
-    renderWithProvider();
-    act(() => { api.reportSaveStart(); });
-    act(() => { api.reportSaveSettled(true); });
-    expect(screen.getByText(/Saved · just now/)).toBeInTheDocument();
-
-    act(() => { vi.advanceTimersByTime(12 * 60 * 1000); });
-    expect(screen.getByText(/Saved · 12m ago/)).toBeInTheDocument();
-  });
-
-  it('resets to "just now" when a new save lands while already showing "saved"', () => {
-    renderWithProvider();
-    act(() => { api.reportSaveStart(); });
-    act(() => { api.reportSaveSettled(true); });
-
-    // Sit on "saved" for 12 minutes so the label has rolled forward.
-    act(() => { vi.advanceTimersByTime(12 * 60 * 1000); });
-    expect(screen.getByText(/Saved · 12m ago/)).toBeInTheDocument();
-
-    // A new save lands. lastSavedAt changes; the label must reset to "just now".
-    act(() => { api.reportSaveStart(); });
-    act(() => { api.reportSaveSettled(true); });
-    expect(screen.getByText(/Saved · just now/)).toBeInTheDocument();
-  });
-
-  it('keeps saving until overlapping writes settle', () => {
+  it('reports success only after all overlapping writes succeed', () => {
     renderWithProvider();
     act(() => { api.reportSaveStart(); api.reportSaveStart(); });
     act(() => { api.reportSaveSettled(true); });
     expect(screen.getByText('Saving…')).toBeInTheDocument();
-    act(() => { api.reportSaveSettled(false); });
-    expect(screen.getByText(/Saved · just now/)).toBeInTheDocument();
+    act(() => { api.reportSaveSettled(true); });
+    expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 
-  it('does not claim a first failed save succeeded', () => {
+  it.each([true, false])('reports a partial failure regardless of completion order (%s)', (first) => {
     renderWithProvider();
-    act(() => { api.reportSaveStart(); });
-    act(() => { api.reportSaveSettled(false); });
-    expect(api.status).toBe('idle');
+    act(() => { api.reportSaveStart(); api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(first); });
+    act(() => { api.reportSaveSettled(!first); });
+    expect(screen.getByText('Save failed')).toBeInTheDocument();
     expect(api.lastSavedAt).toBeNull();
   });
 
-  it('keeps the last successful timestamp when a later save fails', () => {
+  it('preserves the last successful timestamp without presenting a failure as Saved', () => {
     renderWithProvider();
     act(() => { api.reportSaveStart(); });
     act(() => { api.reportSaveSettled(true); });
     const savedAt = api.lastSavedAt;
-    act(() => { vi.advanceTimersByTime(60_000); });
     act(() => { api.reportSaveStart(); });
     act(() => { api.reportSaveSettled(false); });
     expect(api.lastSavedAt).toBe(savedAt);
-    expect(screen.getByText(/Saved · 1m ago/)).toBeInTheDocument();
+    expect(screen.getByText('Save failed')).toBeInTheDocument();
+    act(() => { api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(true); });
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('shows unsaved drafts before debounce and until every field has saved', () => {
+    renderWithProvider();
+    act(() => { api.reportDraft('name', true); api.reportDraft('notes', true); });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    act(() => { api.reportDraft('name', true); });
+    expect(api.pendingEdits).toBe(2);
+    act(() => { api.reportSaveStart(); });
+    act(() => { api.reportSaveSettled(true); api.reportDraft('name', false); });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    act(() => { api.reportDraft('notes', false); });
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('shows offline status without treating reconnection as a successful save', () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    renderWithProvider();
+    act(() => { api.reportDraft('notes', true); });
+    online.mockReturnValue(false);
+    act(() => { window.dispatchEvent(new Event('offline')); });
+    expect(screen.getByText('Offline')).toBeInTheDocument();
+    online.mockReturnValue(true);
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
   });
 });

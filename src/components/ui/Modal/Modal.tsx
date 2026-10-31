@@ -2,6 +2,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import styles from './Modal.module.css';
+import { focusTopModal, isTopModal, registerModal } from './modalStack';
+import { useNotificationTarget } from '@/hooks/useNotificationTarget';
 
 const FOCUSABLE = [
   'a[href]',
@@ -22,6 +24,7 @@ interface ModalProps {
 
 export const Modal = ({ open, onClose, children, className, 'aria-labelledby': labelledBy }: ModalProps) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useNotificationTarget(open, 2);
   const onCloseRef = useRef(onClose);
   const returnFocusRef = useRef<Element | null>(null);
 
@@ -31,23 +34,24 @@ export const Modal = ({ open, onClose, children, className, 'aria-labelledby': l
   useEffect(() => {
     if (!open) return;
 
-    const appRoot = document.getElementById('root');
-    if (!appRoot) return;
-    appRoot.setAttribute('inert', '');
+    const panel = panelRef.current;
+    if (!panel) return;
+    const unregister = registerModal(panel);
 
     returnFocusRef.current = document.activeElement;
     panelRef.current?.focus();
 
     const handleKey = (e: KeyboardEvent) => {
+      if (!isTopModal(panel) || e.defaultPrevented) return;
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         onCloseRef.current();
         return;
       }
 
       if (e.key !== 'Tab') return;
 
-      const panel = panelRef.current;
-      if (!panel) return;
       const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
       if (focusable.length === 0) { e.preventDefault(); return; }
 
@@ -78,19 +82,23 @@ export const Modal = ({ open, onClose, children, className, 'aria-labelledby': l
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('keydown', handleKey);
-      appRoot.removeAttribute('inert');
-      if (returnFocusRef.current instanceof HTMLElement) {
-        returnFocusRef.current.focus();
+      const wasTop = isTopModal(panel);
+      unregister();
+      if (wasTop) {
+        const target = returnFocusRef.current;
+        if (target instanceof HTMLElement && target.isConnected && !target.closest('[inert]')) target.focus();
+        else focusTopModal();
       }
     };
   }, [open]);
 
   if (!open) return null;
 
+  const handleBackdropClick = () => { if (isTopModal(panelRef.current)) onClose(); };
   const handlePanelClick = (e: React.MouseEvent) => e.stopPropagation();
 
   return createPortal(
-    <div className={styles.backdrop} onClick={onClose} role="none">
+    <div className={styles.backdrop} onClick={handleBackdropClick} role="none">
       <div
         ref={panelRef}
         className={clsx(styles.panel, className)}
@@ -100,6 +108,7 @@ export const Modal = ({ open, onClose, children, className, 'aria-labelledby': l
         aria-labelledby={labelledBy}
         tabIndex={-1}
       >
+        <div ref={notificationRef} className={styles.notifications} />
         {children}
       </div>
     </div>,
