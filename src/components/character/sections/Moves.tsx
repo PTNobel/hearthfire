@@ -48,11 +48,10 @@ const MoveSection = ({ label, helperText, moves, emptyText }: MoveSectionProps) 
 interface MovesProps extends PlaybookSectionProps {
   playbook: PlaybookType;
   level: number;
-  gameId: string;
   characterId: string;
 }
 
-export const Moves = ({ playbook, data, onSave, level, gameId, characterId }: MovesProps) => {
+export const Moves = ({ playbook, data, onSave, level, characterId }: MovesProps) => {
   const typeMoves = usePlaybookMoves(playbook);
   // Hoisted so the memo deps match what the React Compiler infers (a bare
   // `background`, not `data?.background`), letting it optimize instead of skip.
@@ -78,13 +77,13 @@ export const Moves = ({ playbook, data, onSave, level, gameId, characterId }: Mo
   // Display preference only: it never changes a character's saved move choices.
   // CharacterSheet remounts by character ID, so each character reads its own preference.
   const [isHideUnselected, setIsHideUnselected] = useState(
-    () => readSelectedMovesOnly(gameId, characterId),
+    () => readSelectedMovesOnly(characterId),
   );
   const handleHideUnselected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked;
     setIsHideUnselected(checked);
-    writeSelectedMovesOnly(gameId, characterId, checked);
-  }, [gameId, characterId]);
+    writeSelectedMovesOnly(characterId, checked);
+  }, [characterId]);
 
   const onSaveRef = useLatest(onSave);
   const forcedMoveIdsRef = useLatest(forcedMoveIds);

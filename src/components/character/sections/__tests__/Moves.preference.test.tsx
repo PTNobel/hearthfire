@@ -14,7 +14,7 @@ vi.mock('@/hooks/usePlaybookMoves', () => ({
 }));
 
 const save = vi.fn().mockResolvedValue(undefined);
-const renderMoves = (characterId = 'character-a', gameId = 'game-1') => render(
+const renderMoves = (characterId = 'character-a') => render(
   <ToastProvider>
     <Moves
       playbook="heavy"
@@ -22,7 +22,6 @@ const renderMoves = (characterId = 'character-a', gameId = 'game-1') => render(
       onSave={save}
       level={1}
       characterId={characterId}
-      gameId={gameId}
     />
   </ToastProvider>,
 );
@@ -46,7 +45,7 @@ describe('Selected only move filter', () => {
     expect(screen.queryByText('Unchosen Test Move')).not.toBeInTheDocument();
     expect(screen.getByText('Chosen Test Move')).toBeInTheDocument();
     expect(screen.getByText('Always Granted Move')).toBeInTheDocument();
-    expect(window.localStorage.getItem(selectedMovesPreferenceKey('game-1', 'character-a'))).toBe('1');
+    expect(window.localStorage.getItem(selectedMovesPreferenceKey('character-a'))).toBe('1');
     first.unmount();
 
     const again = renderMoves();
@@ -61,7 +60,7 @@ describe('Selected only move filter', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('keeps preferences separate for each character and game', async () => {
+  it('keeps preferences separate for each character', async () => {
     const user = userEvent.setup();
     const first = renderMoves();
     await user.click(screen.getByRole('switch', { name: 'Selected only' }));
@@ -70,10 +69,6 @@ describe('Selected only move filter', () => {
     const otherCharacter = renderMoves('character-b');
     expect(screen.getByRole('switch', { name: 'Selected only' })).not.toBeChecked();
     otherCharacter.unmount();
-
-    const otherGame = renderMoves('character-a', 'game-2');
-    expect(screen.getByRole('switch', { name: 'Selected only' })).not.toBeChecked();
-    otherGame.unmount();
 
     renderMoves();
     expect(screen.getByRole('switch', { name: 'Selected only' })).toBeChecked();
