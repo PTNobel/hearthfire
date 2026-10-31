@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { firestoreMockModule, firestoreStore } from '@/test/firestoreMock';
 import { changeQueue, emptyQueue } from '@/lib/syncStorage';
@@ -17,6 +17,7 @@ const form = {
 };
 
 beforeEach(async () => {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
   id = 'crew-link-' + ++sequence;
   await changeQueue(id, () => emptyQueue(id));
   firestoreStore.reset();
@@ -27,12 +28,17 @@ beforeEach(async () => {
   });
 });
 
+afterEach(() => {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+});
+
 const mount = async () => {
   const hook = renderHook(() => useGame(id));
   await waitFor(() => expect(hook.result.current.loading).toBe(false));
   return hook;
 };
 const commit = async () => {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   await getGameSync(id).send();
   const state = getGameSync(id).getSnapshot();
   if (state.queue.error) throw new Error(state.queue.error);
