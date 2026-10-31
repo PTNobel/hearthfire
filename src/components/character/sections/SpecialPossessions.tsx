@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLatest } from '@/hooks/useLatest';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { useCharacterField } from '@/hooks/useCharacterField';
 import { useDebouncedTextField } from '@/hooks/useDebouncedTextField';
 import clsx from 'clsx';
 import { Checkbox, Input, Radio, Text, UseDots } from '@/components/ui';
@@ -19,7 +19,7 @@ type ChooseOverride = { count: number; note?: string };
 interface SpecialPossessionsProps {
   config?: PlaybookSpecialPossessions;
   data?: CharacterData;
-  onSave?: (data: Partial<CharacterData>) => Promise<void>;
+  onSave?: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   level?: number;
   chooseOverride?: ChooseOverride;
 }
@@ -187,14 +187,14 @@ const PossessionLabel = ({ p, checked, selected, uses, onToggle, onRadioSelect, 
 export const SpecialPossessions = ({ config, data, onSave, level = 1, chooseOverride }: SpecialPossessionsProps = {}) => {
   const { addToast } = useToast();
   const onSaveRef = useLatest(onSave);
-  const { value: selected, ref: selectedRef, save: saveSelected } = useOptimisticField(
-    data?.specialPossessions ?? {},
-    (next) => onSaveRef.current?.({ specialPossessions: next }) ?? Promise.resolve(),
+  const savePatch = useCallback((patch: Partial<CharacterData>, base?: Partial<CharacterData>) =>
+    onSave?.(patch, base) ?? Promise.resolve(), [onSave]);
+  const { value: selected, ref: selectedRef, save: saveSelected } = useCharacterField(
+    'specialPossessions', data?.specialPossessions ?? {}, savePatch,
     'Failed to save possession.',
   );
-  const { value: uses, ref: usesRef, save: saveUses } = useOptimisticField(
-    data?.specialPossessionUses ?? {},
-    (next) => onSaveRef.current?.({ specialPossessionUses: next }) ?? Promise.resolve(),
+  const { value: uses, ref: usesRef, save: saveUses } = useCharacterField(
+    'specialPossessionUses', data?.specialPossessionUses ?? {}, savePatch,
     'Failed to save.',
   );
   const [isCollapsed, setIsCollapsed] = useState(false);

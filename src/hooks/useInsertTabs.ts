@@ -5,7 +5,7 @@ import type { Character, CharacterData } from '@/types';
 
 export const useInsertTabs = (
   character: Character,
-  onSave: (data: Partial<CharacterData>) => Promise<void>,
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>,
   // How many tabs precede the inserts on the sheet (the static tabs plus this playbook's own).
   // Passed in from the caller's real tab list rather than hardcoded here: a hardcoded count
   // silently activated the wrong tab the moment a static tab was added.

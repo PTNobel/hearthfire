@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, type MutableRefObject } from 'react';
 import { useLatest } from './useLatest';
 import { useFirestoreSync } from './useFirestoreSync';
 import { useToast } from '@/components/app';
+import { useGameSyncOptional } from '@/components/app/SaveStatus/GameSyncContext';
 
 /**
  * Optimistic local-state field backed by a Firestore write. The single field
@@ -10,11 +11,11 @@ import { useToast } from '@/components/app';
  * `save` accepts EITHER a next value or a transform `(current) => next`. The
  * transform form computes the new value from the freshest state (so concurrent
  * edits don't clobber each other) and captures the pre-save snapshot from that
- * same callback for rollback. Value callers pass the value directly.
+ * same callback as the edit baseline. Value callers pass the value directly.
  *
  * Extra args after the value/transform are forwarded verbatim to `saveFn`, so a
  * caller can persist a narrower patch than the full value (e.g. only the toggled
- * key of a record) while still rolling the whole optimistic value back on failure.
+ * key of a record) while keeping failed work available locally.
  *
  * `save` returns the underlying promise so callers can chain off settlement.
  *
@@ -32,13 +33,19 @@ export const useOptimisticField = <T, A extends unknown[] = []>(
   // save can settle while a text input is still focused, and that settlement must
   // not drop the hold and let an echo clobber the in-flight typing.
   holdRef?: MutableRefObject<boolean>,
+  // Array/form callers pass their original value explicitly to the mutation
+  // layer, so untouched entries cannot be mistaken for edits.
+  editBaseRef?: MutableRefObject<T>,
 ) => {
   const { addToast } = useToast();
+  const durable = !!useGameSyncOptional();
   const addToastRef = useLatest(addToast);
   const saveFnRef = useLatest(saveFn);
   const errorMsgRef = useLatest(errorMsg);
   // Counter: governs save bookkeeping and overlapping-save safety.
   const pendingCountRef = useRef(0);
+  const revisionRef = useRef(0);
+  const failedRef = useRef(false);
   // Boolean mirror: what useFirestoreSync reads to defer remote echoes. Kept as
   // a separate boolean (not the counter) because some callers set it directly.
   const pendingRef = useRef(false);
@@ -56,24 +63,34 @@ export const useOptimisticField = <T, A extends unknown[] = []>(
     // function returns (and twice under StrictMode), so reading `updated` off it
     // synchronously would pass `undefined` to saveFn.
     const prev = ref.current;
+    if (editBaseRef) editBaseRef.current = prev;
     const updated = typeof next === 'function' ? (next as (c: T) => T)(prev) : next;
+    ref.current = updated;
     setValue(updated);
+    const revision = ++revisionRef.current;
     pendingCountRef.current += 1;
     pendingRef.current = true;
-    return saveFnRef.current(updated, ...args)
-      .then(() => undefined)
-      .catch(() => {
-        // Only roll back if our optimistic write is still the current value; a
-        // newer overlapping save may have superseded it, and reverting to this
-        // save's `prev` would clobber that newer edit.
-        setValue((current) => (current === updated ? prev : current));
+    let saved: Promise<unknown>;
+    try { saved = saveFnRef.current(updated, ...args); }
+    catch (error) { saved = Promise.reject(error); }
+    const attempt = Promise.resolve(saved)
+      .then(() => { if (revision === revisionRef.current) failedRef.current = false; })
+      .catch((error) => {
+        // Preserve failed work. Rolling back to another optimistic value can
+        // present an earlier failed edit as if it had been confirmed.
+        if (revision === revisionRef.current) failedRef.current = !durable;
         addToastRef.current(errorMsgRef.current, 'error');
+        throw error;
       })
       .finally(() => {
         pendingCountRef.current -= 1;
-        if (pendingCountRef.current === 0) pendingRef.current = false;
+        if (pendingCountRef.current === 0 && !failedRef.current) pendingRef.current = false;
         setSaveTick((t) => t + 1);
       });
+    // Event handlers may intentionally ignore settlement; awaited callers still
+    // receive the rejection and can keep their form open.
+    void attempt.catch(() => {});
+    return attempt;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { value, ref, setValue, save, pendingRef };

@@ -19,7 +19,7 @@ describe('useCharacterField', () => {
 
     await act(async () => { result.current.save('new'); });
     expect(result.current.value).toBe('new');
-    expect(onSave).toHaveBeenCalledWith({ appearanceCustom: 'new' });
+    expect(onSave).toHaveBeenCalledWith({ appearanceCustom: 'new' }, { appearanceCustom: 'old' });
   });
 });
 
@@ -33,6 +33,6 @@ describe('usePlaybookField', () => {
 
     await act(async () => { result.current.save('silver'); });
     expect(result.current.value).toBe('silver');
-    expect(saveImmediate).toHaveBeenCalledWith({ sacredPouchTrait: 'silver' });
+    expect(saveImmediate).toHaveBeenCalledWith({ sacredPouchTrait: 'silver' }, { sacredPouchTrait: 'iron' });
   });
 });

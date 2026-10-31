@@ -1,9 +1,10 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import { ToastProvider, SaveStatusProvider, SaveStatus, ErrorBoundary } from "@/components/app";
+import { ToastProvider, SaveStatusProvider, ErrorBoundary } from "@/components/app";
 import { Spinner } from "@/components/ui";
 import { SessionRoute } from '@/components/app/SessionRoute';
 import styles from "./App.module.css";
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 /*
  * Each page is lazy-loaded — its JS bundle is only fetched the first time
@@ -44,7 +45,7 @@ const NotFound = lazy(() =>
  *
  * Route map:
  *   /                        → Home
- *   /game                    → Game (party overview, secret in sessionStorage)
+ *   /game                    → Game (party overview, secret in browser storage)
  *   /game/gm                 → GM Playbook
  *   /game/steading           → Steading Playbook
  *   /game/:playbook          → Character Playbook
@@ -54,6 +55,7 @@ const NotFound = lazy(() =>
  * PageLayout / PageHeader, so no shared shell wrapper is needed here.
  */
 export const App = () => {
+  useColorScheme();
   // Key the boundary to the route path so a render error on one page clears
   // when the user navigates elsewhere, instead of blanking the app until reload.
   const { pathname } = useLocation();
@@ -80,9 +82,6 @@ export const App = () => {
         </Routes>
       </Suspense>
     </ErrorBoundary>
-    {/* Fixed-position save indicator — outside the route boundary so a page
-        crash doesn't remove it, inside the provider so it can read status. */}
-    <SaveStatus />
     </SaveStatusProvider>
   </ToastProvider>
   );

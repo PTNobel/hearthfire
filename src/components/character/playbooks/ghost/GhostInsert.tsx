@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { usePlaybookField } from '@/hooks/usePlaybookField';
+import { useCrewSave } from '../shared/useCrewSave';
 import { Move } from '../../Move';
 import type { MoveDefinition, PlaybookSectionProps } from '@/types';
 import { InsertLayout } from '../shared/InsertLayout';
-import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
+import { resolvePlaybookFeatures } from '@/lib/resolvePlaybookFeatures';
 import { GHOST_MOVES, GHOST_CONSEQUENCE_LABELS } from '@/lib/moves/inserts';
 import styles from './GhostInsert.module.css';
 
@@ -37,9 +38,11 @@ const isConsequenceDisabled = (id: string, checked: Record<string, boolean>) =>
 type GhostInsertProps = PlaybookSectionProps;
 
 export const GhostInsert = ({ data, onSave }: GhostInsertProps) => {
-  const { value: furyChecked, save: saveFury } = useOptimisticField(
+  const { saveImmediate } = useCrewSave(data, onSave);
+  const { value: furyChecked, save: saveFury } = usePlaybookField(
+    'ghostPoltergeistFury',
     resolvePlaybookFeatures(data).ghostPoltergeistFury ?? 0,
-    (next) => onSave(featurePatch(data, { ghostPoltergeistFury: next })),
+    saveImmediate,
     'Failed to save.',
   );
 

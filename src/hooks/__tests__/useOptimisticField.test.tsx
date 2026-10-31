@@ -24,12 +24,12 @@ describe('useOptimisticField', () => {
     expect(result.current.value).toBe('next');
   });
 
-  it('rolls back to the previous value when the save rejects', async () => {
+  it('retains the latest draft when local acceptance fails', async () => {
     const saveFn = vi.fn().mockRejectedValue(new Error('network'));
     const { result } = renderHook(() => useOptimisticField<string>('initial', saveFn, 'failed'));
 
     await act(async () => { result.current.save('next'); });
-    expect(result.current.value).toBe('initial');
+    expect(result.current.value).toBe('next');
   });
 
   it('skips a remote sync while a save is pending, then flushes it after the save resolves', async () => {

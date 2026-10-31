@@ -2,6 +2,7 @@ import { initializeApp, cert, type ServiceAccount } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as path from 'path';
 import * as fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { EXPORT_FORMAT, EXPORT_VERSION } from '@/lib/gameBackupFormat';
 
 const serviceKeyPath = path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS ?? '');
@@ -122,7 +123,16 @@ const restore = async () => {
         console.log(`  already restored (checkpoint) — skipping: ${id}`);
         continue;
       }
-      await db.collection('games').doc(id).set(data[id] as Record<string, unknown>);
+      const ref = db.collection('games').doc(id);
+      const generation = randomUUID();
+      await db.runTransaction(async (tx) => {
+        const previous = (await tx.get(ref)).data();
+        tx.set(ref, {
+          ...(data[id] as Record<string, unknown>),
+          notesLocks: {},
+          sync: { protocol: 2, generation, revision: (Number(previous?.sync?.revision) || 0) + 1 },
+        });
+      });
       done.add(id);
       saveCheckpoint(done);
       restored++;

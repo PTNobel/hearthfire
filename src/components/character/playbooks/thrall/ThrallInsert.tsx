@@ -4,8 +4,7 @@ import { Button, Input, Text } from '@/components/ui';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
 import { Move } from '../../Move';
 import { OptionSelect } from '../../sections/OptionSelect';
-import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { resolvePlaybookFeatures } from '@/lib/resolvePlaybookFeatures';
 import { usePlaybookField } from '@/hooks/usePlaybookField';
 import { useCrewSave } from '../shared/useCrewSave';
 import { useTrackedField } from '../shared/useTrackedField';
@@ -76,19 +75,22 @@ export const ThrallInsert = ({ data, onSave }: ThrallInsertProps) => {
   const { value: master, handleChange: handleMasterChange, handleBlur: handleMasterBlur } =
     useTrackedField(init.thrallMaster ?? '', 'thrallMaster', saveDebounced, flushDebounce);
 
-  const { value: favor, save: saveFavor } = useOptimisticField(
+  const { value: favor, save: saveFavor } = usePlaybookField(
+    'thrallFavor',
     init.thrallFavor ?? 0,
-    (next) => onSave(featurePatch(data, { thrallFavor: next })),
+    saveImmediate,
     'Failed to save.',
   );
-  const { value: marksGained, ref: marksGainedRef, save: saveMarksGained } = useOptimisticField(
+  const { value: marksGained, ref: marksGainedRef, save: saveMarksGained } = usePlaybookField(
+    'thrallMarksGained',
     init.thrallMarksGained ?? {},
-    (next) => onSave(featurePatch(data, { thrallMarksGained: next })),
+    saveImmediate,
     'Failed to save.',
   );
-  const { value: marksCrossedOff, ref: marksCrossedOffRef, save: saveMarksCrossedOff } = useOptimisticField(
+  const { value: marksCrossedOff, ref: marksCrossedOffRef, save: saveMarksCrossedOff } = usePlaybookField(
+    'thrallMarksCrossedOff',
     init.thrallMarksCrossedOff ?? {},
-    (next) => onSave(featurePatch(data, { thrallMarksCrossedOff: next })),
+    saveImmediate,
     'Failed to save.',
   );
   const { value: thrallInstinct, save: saveThrallInstinct } = usePlaybookField('thrallInstinct', init.thrallInstinct ?? '', saveImmediate, 'Failed to save.');

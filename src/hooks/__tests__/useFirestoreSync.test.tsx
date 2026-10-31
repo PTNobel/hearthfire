@@ -21,6 +21,15 @@ const harness = (initial: string) => {
 };
 
 describe('useFirestoreSync', () => {
+  it('drops an intermediate snapshot when the server returns to the previously applied value', () => {
+    const { setter, rerender } = harness('a');
+    setter.mockClear();
+    act(() => { rerender({ value: 'intermediate', pending: true }); });
+    act(() => { rerender({ value: 'a', pending: true }); });
+    act(() => { rerender({ value: 'a', pending: false }); });
+    expect(setter).not.toHaveBeenCalledWith('intermediate');
+  });
+
   it('pushes a changed remote value to the setter when no save is pending', () => {
     const { setter, rerender } = harness('a');
     // Initial mount applies the first value.

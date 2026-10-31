@@ -62,7 +62,7 @@ import type { RollReport } from '@/components/character/Move/RollAffordance';
 import { CharacterRollContext } from '@/components/character/Move/CharacterRollContext';
 import styles from './CharacterPlaybook.module.css';
 
-type PlaybookSectionComponent = ComponentType<{ data: CharacterData | undefined; onSave: (data: Partial<CharacterData>) => Promise<void> }>;
+type PlaybookSectionComponent = ComponentType<{ data: CharacterData | undefined; onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void> }>;
 type PlaybookSectionEntry = { key: string; Component: PlaybookSectionComponent };
 
 const PLAYBOOK_SECTIONS: Partial<Record<PlaybookType, PlaybookSectionEntry[]>> = {
@@ -91,7 +91,7 @@ const INSERT_INSTINCT_KEYS: { feature: keyof PlaybookFeatures; label: string }[]
 ];
 
 
-const PCPlaybookTab = ({ playbook, data, level, playbookOption, onSave, insertInstinctNote }: { playbook: PlaybookType; data: CharacterData | undefined; level: number; playbookOption: (typeof PLAYBOOKS)[number]; onSave: (data: Partial<CharacterData>) => Promise<void>; insertInstinctNote: string | undefined }) => {
+const PCPlaybookTab = ({ playbook, data, level, playbookOption, onSave, insertInstinctNote }: { playbook: PlaybookType; data: CharacterData | undefined; level: number; playbookOption: (typeof PLAYBOOKS)[number]; onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>; insertInstinctNote: string | undefined }) => {
   const foxChooseOverride = playbook === 'fox' && data?.background === FOX_LIFE_OF_CRIME_BACKGROUND
     ? { count: 3, note: '+1 from A Life of Crime' }
     : undefined;
@@ -156,7 +156,7 @@ interface SheetProps {
   prosperity: number;
   nav: GameNav;
   updateCharacterName: (characterId: string, name: string) => Promise<void>;
-  updateCharacterData: (characterId: string, data: Partial<CharacterData>) => Promise<void>;
+  updateCharacterData: (characterId: string, data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   adjustCharacterStats: (characterId: string, deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
   logRoll: (roll: LoggedRoll) => Promise<void>;
   notesHtml: string | undefined;
@@ -167,7 +167,7 @@ interface SheetProps {
 type PlaybookTabConfig = {
   id: string;
   label: string;
-  render: (data: CharacterData | undefined, onSave: (data: Partial<CharacterData>) => Promise<void>, prosperity: number) => ReactNode;
+  render: (data: CharacterData | undefined, onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>, prosperity: number) => ReactNode;
   when?: (data: CharacterData | undefined) => boolean;
 };
 
@@ -224,7 +224,7 @@ const CharacterSheet = ({ character, playbookOption, id, gameName, prosperity, n
   );
 
   const handleSaveCharacterData = useCallback(
-    (data: Partial<CharacterData>) => updateCharacterData(character.id, data),
+    (data: Partial<CharacterData>, base?: Partial<CharacterData>) => updateCharacterData(character.id, data, base),
     [updateCharacterData, character.id]
   );
 
@@ -401,7 +401,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
   id: string;
   playbook: PlaybookType;
   updateCharacterName: (characterId: string, name: string) => Promise<void>;
-  updateCharacterData: (characterId: string, data: Partial<CharacterData>) => Promise<void>;
+  updateCharacterData: (characterId: string, data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
   adjustCharacterStats: (characterId: string, deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
   logRoll: (roll: LoggedRoll) => Promise<void>;
   notesActions: NotesActions;

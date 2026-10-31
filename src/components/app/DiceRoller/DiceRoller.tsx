@@ -1,3 +1,4 @@
+import { useNotificationTarget } from '@/hooks/useNotificationTarget';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Button, Heading, Icon, Input, Text } from '@/components/ui';
@@ -53,6 +54,7 @@ const withModifier = (notation: string, delta: number): string => {
 // on the game page.
 export const DiceRoller = ({ rollerId, rollerName, onRoll }: DiceRollerProps) => {
   const [open, setOpen] = useState(false);
+  const notificationRef = useNotificationTarget(open, 1);
   const [notation, setNotation] = useState('');
   const [error, setError] = useState<string | undefined>();
   // This session's rolls, newest first, so a result can be glanced at or re-rolled. Local only — the
@@ -167,6 +169,7 @@ export const DiceRoller = ({ rollerId, rollerName, onRoll }: DiceRollerProps) =>
           </Heading>
           <Button type="button" variant="ghost" size="sm" icon="close" aria-label="Close dice roller" onClick={handleClose} />
         </div>
+        <div ref={notificationRef} className={styles.notifications} />
         <form className={styles.form} onSubmit={handleSubmit}>
           <Input
             ref={inputRef}

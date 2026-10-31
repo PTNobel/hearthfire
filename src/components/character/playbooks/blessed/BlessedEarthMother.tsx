@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
-import { useOptimisticField } from '@/hooks/useOptimisticField';
+import { usePlaybookField } from '@/hooks/usePlaybookField';
+import { useCrewSave } from '../shared/useCrewSave';
 import { CheckboxGroup, Divider, Radio, RadioGroup, Text } from '@/components/ui';
 import { PlaybookSection } from '@/components/playbook/PlaybookSection';
-import { resolvePlaybookFeatures, featurePatch } from '@/lib/resolvePlaybookFeatures';
+import { resolvePlaybookFeatures } from '@/lib/resolvePlaybookFeatures';
 import type { PlaybookSectionProps } from '@/types';
 import styles from './BlessedEarthMother.module.css';
 
@@ -28,15 +29,18 @@ type BlessedEarthMotherProps = PlaybookSectionProps;
 
 export const BlessedEarthMother = ({ data, onSave }: BlessedEarthMotherProps) => {
   const features = resolvePlaybookFeatures(data);
+  const { saveImmediate } = useCrewSave(data, onSave);
 
-  const { value: shrine, save: saveShrine } = useOptimisticField(
+  const { value: shrine, save: saveShrine } = usePlaybookField(
+    'earthMotherShrine',
     features.earthMotherShrine ?? '',
-    (next) => onSave(featurePatch(data, { earthMotherShrine: next })),
+    saveImmediate,
     'Failed to save.',
   );
-  const { value: offerings, ref: offeringsRef, save: saveOfferings } = useOptimisticField(
+  const { value: offerings, ref: offeringsRef, save: saveOfferings } = usePlaybookField(
+    'earthMotherOfferings',
     features.earthMotherOfferings ?? {},
-    (next) => onSave(featurePatch(data, { earthMotherOfferings: next })),
+    saveImmediate,
     'Failed to save.',
   );
 

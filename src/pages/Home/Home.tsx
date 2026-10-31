@@ -3,16 +3,29 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { PageMeta } from '@/components/app/PageMeta/PageMeta';
 import { PageLayout } from '@/components/app/PageLayout/PageLayout';
 import { createGameWithId, gameIdExists } from '@/lib/game';
-import { saveSessionGameId } from '@/lib/sessionGame';
+import { clearSessionGameId, saveSessionGameId } from '@/lib/sessionGame';
+import { useSessionGameId } from '@/hooks/useSessionGameId';
 import { Button, Heading, Icon, Input, RuleDivider, Stack, Text } from '@/components/ui';
 import styles from './Home.module.css';
 
 export const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const rememberedId = useSessionGameId();
   const [sessionId, setSessionId] = useState('');
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState('');
+
+  const handleContinue = useCallback(() => navigate('/game'), [navigate]);
+  const handleForget = useCallback(() => {
+    try {
+      clearSessionGameId();
+      setSessionId('');
+      setError('');
+    } catch {
+      setError('Unable to forget this game. Check your browser’s site-storage settings.');
+    }
+  }, []);
 
   const handleOpen = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,8 +84,15 @@ export const Home = () => {
 
         <div className={styles.cards}>
           <div className={styles.card}>
-            <Heading as="h2" size="label">Open Game</Heading>
-            <form onSubmit={handleOpen} className={styles.cardBody}>
+            <Heading as="h2" size="label">{rememberedId ? 'Your game' : 'Open Game'}</Heading>
+            {rememberedId ? (
+              <Stack gap={3}>
+                <Button type="button" size="lg" fullWidth onClick={handleContinue}>Continue game</Button>
+                <Button type="button" variant="ghost" fullWidth onClick={handleForget}>Forget this device</Button>
+                <Text color="muted" size="xs">Forgetting removes remembered access. Saved drafts and offline game data stay in this browser.</Text>
+                {error && <Text color="muted" size="xs" role="alert">{error}</Text>}
+              </Stack>
+            ) : <form onSubmit={handleOpen} className={styles.cardBody}>
               <Text color="muted" size="xs">
                 Enter your session ID.
               </Text>
@@ -96,7 +116,7 @@ export const Home = () => {
               <Button type="submit" size="lg" fullWidth disabled={opening || !sessionId.trim()}>
                 {opening ? 'Opening…' : 'Open Game'}
               </Button>
-            </form>
+            </form>}
           </div>
         </div>
       </div>

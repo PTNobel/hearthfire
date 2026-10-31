@@ -2,9 +2,8 @@ import { useState, useCallback } from 'react';
 import { useDebouncedSave } from './useDebouncedSave';
 import { useFirestoreSync } from './useFirestoreSync';
 
-// Shared state for a single free-text field backed by a debounced Firestore
-// write: local optimistic value, debounce-on-change, flush-on-blur, and a
-// pending guard so remote echoes don't clobber in-flight edits.
+// Shared text state: accept each change locally, request network flush on blur,
+// and defer incoming values only while local acceptance is in flight.
 export const useDebouncedTextField = (
   firestoreValue: string,
   save: (value: string) => Promise<void>,

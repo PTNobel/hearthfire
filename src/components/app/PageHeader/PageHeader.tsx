@@ -10,6 +10,8 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/app";
 import { PageNav } from "./PageNav";
+import { SaveStatus } from '@/components/app/SaveStatus/SaveStatus';
+import { useSaveStatusActionsOptional } from '@/components/app/SaveStatus/SaveStatusContext';
 import { ThemeToggle } from "./ThemeToggle";
 import type { GameNav } from "./gameNav";
 import { SiteBanner } from "@/components/app/SiteBanner/SiteBanner";
@@ -76,9 +78,14 @@ export const PageHeader = (props: Props) => {
    * them here even though simple mode never touches them.
    */
   const { addToast } = useToast();
+  const draftStatus = useSaveStatusActionsOptional();
+  const draftId = useId();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [copied, setCopied] = useState(false);
+  const savingRef = useRef(false);
+  const editSaveRef = useRef<((value: string) => Promise<void>) | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editBtnRef = useRef<HTMLButtonElement>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,6 +96,11 @@ export const PageHeader = (props: Props) => {
   const editTooltipId = useId();
   const copyTooltipId = useId();
   const navDropdownId = useId();
+
+  useEffect(() => {
+    draftStatus?.reportDraft(draftId, editing);
+    return () => draftStatus?.reportDraft(draftId, false);
+  }, [draftStatus, draftId, editing]);
 
   useEffect(() => {
     if (editing) {
@@ -108,19 +120,27 @@ export const PageHeader = (props: Props) => {
   const startEditing = useCallback(() => {
     if (simple) return;
     setValue((props as FullProps).title);
+    // Keep the mutation's opening snapshot, even if another tab renames the
+    // same item while this input is open.
+    editSaveRef.current = (props as FullProps).onSaveTitle;
     setEditing(true);
   }, [simple, props]);
 
   const commit = useCallback(async () => {
-    if (simple) return;
+    if (simple || savingRef.current) return;
     const fullProps = props as FullProps;
     const trimmed = value.trim();
+    savingRef.current = true;
+    setSaving(true);
     try {
-      if (trimmed && trimmed !== fullProps.title) await fullProps.onSaveTitle?.(trimmed);
-    } catch {
-      addToast("Failed to save game name. Try again.", "error");
-    } finally {
+      if (trimmed && trimmed !== fullProps.title) await editSaveRef.current?.(trimmed);
       setEditing(false);
+    } catch {
+      committingViaKeyboardRef.current = false;
+      addToast("Could not preserve this name. Keep the draft open and retry.", "error");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }, [simple, props, value, addToast]);
 
@@ -186,6 +206,7 @@ export const PageHeader = (props: Props) => {
               ref={inputRef as React.Ref<HTMLInputElement>}
               className={styles.titleInput}
               value={value}
+              readOnly={saving}
               onChange={handleChange}
               onBlur={commit}
               onKeyDown={handleKeyDown}
@@ -270,6 +291,7 @@ export const PageHeader = (props: Props) => {
             <Link to="/" className={styles.wordmarkLink}>Hearthfire</Link>
           </Heading>
           <div className={styles.topBarActions}>
+            <SaveStatus />
             {miroBoardUrl && (
               <a
                 href={miroBoardUrl}

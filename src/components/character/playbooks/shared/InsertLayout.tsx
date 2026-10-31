@@ -38,7 +38,7 @@ interface InsertLayoutProps extends PlaybookSectionProps {
   isConsequenceDisabled?: (id: string, checked: Record<string, boolean>) => boolean;
   consequenceAddon?: (props: {
     consequences: Record<string, boolean>;
-    saveImmediate: (patch: Partial<PlaybookFeatures>) => Promise<void>;
+    saveImmediate: (patch: Partial<PlaybookFeatures>, base?: Partial<PlaybookFeatures>) => Promise<void>;
     updateChecked: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void;
   }) => ReactNode;
   checkboxGroupItemGap?: 'sm' | 'md' | 'lg';

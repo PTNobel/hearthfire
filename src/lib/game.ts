@@ -1,8 +1,9 @@
 import { addDoc, collection, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
 import { GAMES_COLLECTION } from './constants';
+import { generateId } from './id';
 
-const newGame = () => ({ name: '', createdAt: Date.now(), characters: [] });
+const newGame = () => ({ name: '', createdAt: Date.now(), characters: [], sync: { protocol: 2, generation: generateId(), revision: 0 } });
 
 export const createGame = async (): Promise<string> => {
   const ref = await addDoc(collection(db, GAMES_COLLECTION), newGame());

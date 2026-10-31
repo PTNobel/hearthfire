@@ -4,6 +4,7 @@ import { Button } from '@/components/ui';
 import { Icon } from '@/components/ui';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { useLatest } from '@/hooks/useLatest';
+import { useFirestoreSync } from '@/hooks/useFirestoreSync';
 import styles from './RepeaterField.module.css';
 
 interface BaseItem {
@@ -201,26 +202,10 @@ export const RepeaterField = (props: RepeaterFieldProps) => {
   // eslint-disable-next-line react-hooks/refs
   const [local, setLocal] = useState<LocalItem[]>(() => itemsToLocal(props.items, 0));
   const [pendingFocusId, setPendingFocusId] = useState<number | null>(null);
-  const lastSavedRef = useRef<string>(JSON.stringify(props.items));
-
-  // Guard: only accept external updates when local state matches last save (no in-flight edits).
-  useEffect(() => {
-    const incoming = JSON.stringify(props.items);
-    if (incoming === lastSavedRef.current) return;
-    const localKey = JSON.stringify(toValues(local));
-    if (localKey !== lastSavedRef.current) return;
-    lastSavedRef.current = incoming;
-    // Advance nextId past the incoming length to avoid reusing IDs from prior local additions.
-    nextId.current = Math.max(nextId.current, props.items.length);
-    setLocal(itemsToLocal(props.items, 0));
-  // itemsToLocal and toValues are stable; props.items identity drives this effect.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.items]);
+  const localRef = useLatest(local);
 
   const wrappedSave = useCallback(async (rows: LocalItem[]) => {
     const values = toValues(rows);
-    const key = JSON.stringify(values);
-    lastSavedRef.current = key;
     if (variantRef.current === 'checked') {
       await (onSaveRef.current as CheckedProps['onSave'])(values as { checked: boolean; text: string }[]);
     } else if (variantRef.current === 'checked-weight') {
@@ -230,61 +215,44 @@ export const RepeaterField = (props: RepeaterFieldProps) => {
     }
   }, [toValues, onSaveRef]);
 
-  const { onChange: debouncedChange, flush } = useDebouncedSave(wrappedSave, 1500);
+  const { onChange: debouncedChange, flush, isPendingRef } = useDebouncedSave(wrappedSave);
+  useFirestoreSync(props.items, (items) => {
+    nextId.current = Math.max(nextId.current, items.length);
+    setLocal((current) => JSON.stringify(toValues(current)) === JSON.stringify(items) ? current : itemsToLocal(items, 0));
+  }, isPendingRef);
+
+  const update = useCallback((next: LocalItem[], immediately = false) => {
+    localRef.current = next;
+    setLocal(next);
+    if (immediately) void flush(next);
+    else debouncedChange(next);
+  }, [localRef, flush, debouncedChange]);
 
   const handleTextChange = useCallback((id: number, text: string) => {
-    setLocal((prev) => {
-      const next = prev.map((r) => r.id === id ? { ...r, text } : r);
-      debouncedChange(next);
-      return next;
-    });
-  }, [debouncedChange]);
-
+    update(localRef.current.map((r) => r.id === id ? { ...r, text } : r));
+  }, [update, localRef]);
   const handleTextBlur = useCallback((id: number) => {
-    setLocal((prev) => {
-      const next = prev.map((r) => r.id === id ? { ...r, text: r.text.trim() } : r);
-      flush(next);
-      return next;
-    });
-  }, [flush]);
-
+    update(localRef.current.map((r) => r.id === id ? { ...r, text: r.text.trim() } : r), true);
+  }, [update, localRef]);
   const handleCheckedChange = useCallback((id: number, checked: boolean) => {
-    setLocal((prev) => {
-      const next = prev.map((r) => r.id === id ? { ...r, checked } : r);
-      flush(next);
-      return next;
-    });
-  }, [flush]);
-
+    update(localRef.current.map((r) => r.id === id ? { ...r, checked } : r), true);
+  }, [update, localRef]);
   const handleWeightChange = useCallback((id: number, weight: 1 | 2) => {
-    setLocal((prev) => {
-      const next = prev.map((r) => r.id === id ? { ...r, weight } : r);
-      flush(next);
-      return next;
-    });
-  }, [flush]);
-
+    update(localRef.current.map((r) => r.id === id ? { ...r, weight } : r), true);
+  }, [update, localRef]);
   const handleAdd = useCallback(() => {
     const id = nextId.current++;
     setPendingFocusId(id);
-    setLocal((prev) => {
-      // variantRef.current never changes after mount; reading it here is safe.
-      const newItem: LocalItem = variantRef.current === 'checked'
-        ? { id, variant: 'checked', checked: false, text: '' }
-        : variantRef.current === 'checked-weight'
-          ? { id, variant: 'checked-weight', checked: false, text: '', weight: 1 }
-          : { id, variant: 'plain', text: '' };
-      return [...prev, newItem];
-    });
-  }, []);
-
+    const item: LocalItem = variantRef.current === 'checked'
+      ? { id, variant: 'checked', checked: false, text: '' }
+      : variantRef.current === 'checked-weight'
+        ? { id, variant: 'checked-weight', checked: false, text: '', weight: 1 }
+        : { id, variant: 'plain', text: '' };
+    update([...localRef.current, item]);
+  }, [update, localRef]);
   const handleRemove = useCallback((id: number) => {
-    setLocal((prev) => {
-      const next = prev.filter((r) => r.id !== id);
-      flush(next);
-      return next;
-    });
-  }, [flush]);
+    update(localRef.current.filter((r) => r.id !== id), true);
+  }, [update, localRef]);
 
   const handleFocusConsumed = useCallback(() => setPendingFocusId(null), []);
 

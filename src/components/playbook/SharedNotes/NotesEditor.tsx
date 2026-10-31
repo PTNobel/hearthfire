@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
-import { useLatest } from '@/hooks/useLatest';
 import { useNotesLock } from '@/hooks/useNotesLock';
 import { Text } from '@/components/ui';
 import type { NotesLock } from '@/types';
@@ -121,21 +120,22 @@ const Toolbar = ({ editor, disabled, controlsId }: ToolbarProps) => {
 
 export const NotesEditor = ({ html, lock, label, onSave, onClaim, onRefresh, onRelease }: NotesEditorProps) => {
   const editorRef = useRef<Editor | null>(null);
-  const htmlRef = useLatest(html);
+  const [claimBlocked, setClaimBlocked] = useState(false);
   const contentId = useId();
   const statusId = useId();
 
   const { othersTyping, noteChange, noteBlur, isBusy } = useNotesLock({
     lock,
     getHtml: () => editorRef.current?.getHTML() ?? '',
-    claim: onClaim,
+    claim: async () => {
+      const claimed = await onClaim();
+      if (claimed) setClaimBlocked(false);
+      return claimed;
+    },
     refresh: onRefresh,
     release: onRelease,
     save: onSave,
-    onClaimRejected: () => {
-      const editor = editorRef.current;
-      if (editor && !editor.isDestroyed) editor.commands.setContent(htmlRef.current, { emitUpdate: false });
-    },
+    onClaimRejected: () => setClaimBlocked(true),
   });
 
   const editor = useEditor({
@@ -185,6 +185,7 @@ export const NotesEditor = ({ html, lock, label, onSave, onClaim, onRefresh, onR
       {/* Always mounted so screen readers announce the message when it appears. */}
       <div id={statusId} className={styles.status} aria-live="polite">
         {othersTyping && <Text as="span" size="xs" color="muted" italic>Someone is typing…</Text>}
+        {claimBlocked && !othersTyping && <Text as="span" size="xs" color="muted">Your draft is kept locally. Check the save status before closing.</Text>}
       </div>
     </div>
   );

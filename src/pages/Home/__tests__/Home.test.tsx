@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createGameWithId, gameIdExists } from '@/lib/game';
 import { Home } from '../Home';
-import { getSessionGameId, clearSessionGameId } from '@/lib/sessionGame';
+import { getSessionGameId, saveSessionGameId, clearSessionGameId } from '@/lib/sessionGame';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -59,5 +59,37 @@ describe('Home', () => {
     expect(getSessionGameId()).toBeNull();
     expect(mockCreateGame).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('continues a remembered game without asking for or exposing its ID', async () => {
+    saveSessionGameId('private-remembered-game');
+    const { container } = renderWithProviders(<Home />);
+    expect(screen.queryByLabelText(/session id/i)).not.toBeInTheDocument();
+    expect(container.innerHTML).not.toContain('private-remembered-game');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue game' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/game');
+    expect(mockGameIdExists).not.toHaveBeenCalled();
+    expect(mockCreateGame).not.toHaveBeenCalled();
+  });
+
+  it('forgets remembered access and returns to an empty sign-in form', async () => {
+    saveSessionGameId('private-remembered-game');
+    renderWithProviders(<Home />);
+    await userEvent.click(screen.getByRole('button', { name: 'Forget this device' }));
+    expect(getSessionGameId()).toBeNull();
+    expect(screen.getByLabelText(/session id/i)).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'Continue game' })).not.toBeInTheDocument();
+  });
+
+  it('updates when another tab remembers or forgets a game', () => {
+    renderWithProviders(<Home />);
+    const update = (value: string) => act(() => {
+      localStorage.setItem('hearthfire:session-game-id', value);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'hearthfire:session-game-id', storageArea: localStorage }));
+    });
+    update('remembered-elsewhere');
+    expect(screen.getByRole('button', { name: 'Continue game' })).toBeInTheDocument();
+    update('');
+    expect(screen.getByLabelText(/session id/i)).toBeInTheDocument();
   });
 });

@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=24"
   },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7"
+  },
   "scripts": {
     "dev": "vite",
     "test": "vitest run",
@@ -24,7 +27,8 @@
     "inspect-game": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/inspect-game.ts",
     "duplicate-game": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json tsx --tsconfig scripts/tsconfig.json scripts/duplicate-game.ts",
     "render:rules": "node scripts/render-firestore-rules.mjs",
-    "test:rules": "node --test scripts/render-firestore-rules.test.mjs"
+    "test:rules": "node --test scripts/render-firestore-rules.test.mjs",
+    "test:sync": "npm exec --yes --package=firebase-tools@15.34.2 -- firebase emulators:exec --only firestore --project demo-hearthfire --config firebase.emulator.json 'node --test scripts/sync-rules.test.mjs && playwright test'"
   },
   "dependencies": {
     "@fontsource/im-fell-english": "^5.3.0",
@@ -41,6 +45,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -51,6 +57,7 @@
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
+    "fake-indexeddb": "^6.2.7",
     "firebase-admin": "^14.5.0",
     "globals": "^17.13.0",
     "jsdom": "^29.1.1",

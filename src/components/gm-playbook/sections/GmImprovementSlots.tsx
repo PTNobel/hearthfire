@@ -127,7 +127,7 @@ const GmImprovementCard = ({ slot, index, onFocus, onBlur, onChange, onCategoryC
 
 interface GmImprovementSlotsProps {
   gmImprovements: GmImprovement[] | undefined;
-  onSave: (patch: Partial<SteadingData>) => Promise<void>;
+  onSave: (patch: Partial<SteadingData>, base?: Partial<SteadingData>) => Promise<void>;
 }
 
 export const GmImprovementSlots = ({ gmImprovements, onSave }: GmImprovementSlotsProps) => {
@@ -137,20 +137,20 @@ export const GmImprovementSlots = ({ gmImprovements, onSave }: GmImprovementSlot
   // save *while* a title field is still focused — so it's passed to the hook as its
   // own gate rather than folded into pendingRef.
   const focusedRef = useRef(false);
+  const slotsBase = useRef<GmImprovement[]>(gmImprovements ?? []);
 
   const {
     value: localSlots,
     ref: localSlotsRef,
-    setValue: setLocalSlots,
     save: saveSlots,
   } = useOptimisticField<GmImprovement[], [removedId?: string]>(
     gmImprovements ?? [],
-    (slots, removedId) => onSave({
+    (slots, removedId): Promise<void> => onSave({
       gmImprovements: slots,
       ...(removedId ? { removedGmImprovementIds: [removedId] } : {}),
-    }),
+    }, { gmImprovements: slotsBase.current }),
     undefined,
-    focusedRef,
+    focusedRef, slotsBase,
   );
 
   const handleSlotFocus = useCallback(() => {
@@ -159,8 +159,8 @@ export const GmImprovementSlots = ({ gmImprovements, onSave }: GmImprovementSlot
 
   // Optimistic-only update while typing; the write is deferred to blur.
   const handleSlotChange = useCallback((index: number, patch: Partial<GmImprovement>) => {
-    setLocalSlots((prev) => prev.map((s, i) => i === index ? { ...s, ...patch } : s));
-  }, [setLocalSlots]);
+    void saveSlots((prev) => prev.map((s, i) => i === index ? { ...s, ...patch } : s));
+  }, [saveSlots]);
 
   const handleSlotBlur = useCallback(() => {
     focusedRef.current = false;

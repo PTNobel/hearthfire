@@ -257,7 +257,7 @@ export interface CharacterData {
 
 export interface PlaybookSectionProps {
   data: CharacterData | undefined;
-  onSave: (data: Partial<CharacterData>) => Promise<void>;
+  onSave: (data: Partial<CharacterData>, base?: Partial<CharacterData>) => Promise<void>;
 }
 
 export interface Character {

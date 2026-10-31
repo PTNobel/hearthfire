@@ -38,12 +38,7 @@ export const MysteryCreatureCard = memo(
     const handleFieldChange = useCallback(
       <K extends keyof Creature>(field: K, value: Creature[K]) => {
         const next = { ...creatureRef.current, [field]: value };
-        // Loyalty has no blur, so persist it right away; text fields persist on blur.
-        if (field === "loyalty") {
-          commit(next);
-        } else {
-          setCreature(next);
-        }
+        commit(next);
       },
       [commit, creatureRef],
     );

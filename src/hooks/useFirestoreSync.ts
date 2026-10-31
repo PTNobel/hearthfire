@@ -16,7 +16,12 @@ export const useFirestoreSync = <T>(
 
   useEffect(() => {
     const serialized = JSON.stringify(firestoreValue);
-    if (serialized === lastRef.current) return;
+    if (serialized === lastRef.current) {
+      // The server can return to the previously applied value while we are
+      // editing. That newer snapshot supersedes an intermediate deferred one.
+      deferredRef.current = null;
+      return;
+    }
     // While a local save is pending, defer the incoming value rather than
     // applying it (which would clobber the optimistic local state with the echo
     // of our own in-flight write). We remember it so the next snapshot — or a
