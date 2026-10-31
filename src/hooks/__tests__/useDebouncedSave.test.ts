@@ -1,8 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDebouncedSave } from '../useDebouncedSave';
+import { addToastSpy, toastModuleMock } from '@/test/toastMock';
 
-vi.mock('@/components/app/Toast/ToastContext', () => ({ useToastOptional: () => ({ addToast: vi.fn() }) }));
+vi.mock('@/components/app/Toast/ToastContext', () => toastModuleMock());
+beforeEach(() => addToastSpy.mockClear());
 
 describe('local draft acceptance', () => {
   it('submits each revision immediately instead of leaving typing on a timer', async () => {
@@ -29,6 +31,22 @@ describe('local draft acceptance', () => {
     await act(async () => { result.current.onChange('first'); result.current.onChange('latest'); });
     await act(async () => { reject(new Error('old failure')); });
     expect(result.current.isPending).toBe(false);
+    expect(addToastSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports the most recent failed revision, but no earlier successful callback', async () => {
+    let resolveOld: () => void = () => {};
+    const save = vi.fn().mockImplementationOnce(() => new Promise<void>((resolve) => { resolveOld = resolve; }))
+      .mockRejectedValueOnce(new Error('latest failed'));
+    const onSuccess = vi.fn();
+    const onError = vi.fn();
+    const { result } = renderHook(() => useDebouncedSave(save, 1500, onError, onSuccess));
+    await act(async () => { result.current.onChange('old'); result.current.onChange('latest'); });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onSuccess).not.toHaveBeenCalled();
+    await act(async () => { resolveOld(); });
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledOnce();
   });
   it('retains a failed draft until a later attempt is accepted', async () => {
     const save = vi.fn().mockRejectedValue(new Error('storage unavailable'));

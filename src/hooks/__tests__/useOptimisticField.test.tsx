@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { toastModuleMock } from '@/test/toastMock';
+import { addToastSpy, toastModuleMock } from '@/test/toastMock';
 
 vi.mock('@/components/app', () => toastModuleMock());
 
@@ -24,12 +24,27 @@ describe('useOptimisticField', () => {
     expect(result.current.value).toBe('next');
   });
 
+  it('does not show an obsolete save failure after a newer value was accepted', async () => {
+    let rejectOld: (error: Error) => void = () => {};
+    const saveFn = vi.fn().mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectOld = reject; }))
+      .mockResolvedValue(undefined);
+    const { result } = renderHook(() => useOptimisticField('initial', saveFn, 'failed'));
+
+    act(() => { void result.current.save('older'); });
+    await act(async () => { await result.current.save('newer'); });
+    await act(async () => { rejectOld(new Error('old failure')); });
+    expect(result.current.value).toBe('newer');
+    expect(result.current.pendingRef.current).toBe(false);
+    expect(addToastSpy).not.toHaveBeenCalled();
+  });
+
   it('retains the latest draft when local acceptance fails', async () => {
     const saveFn = vi.fn().mockRejectedValue(new Error('network'));
     const { result } = renderHook(() => useOptimisticField<string>('initial', saveFn, 'failed'));
 
-    await act(async () => { result.current.save('next'); });
+    await act(async () => { void result.current.save('next'); });
     expect(result.current.value).toBe('next');
+    expect(addToastSpy).toHaveBeenCalledWith('failed', 'error');
   });
 
   it('skips a remote sync while a save is pending, then flushes it after the save resolves', async () => {
