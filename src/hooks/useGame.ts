@@ -43,6 +43,13 @@ const mergeRecord = (base: Record<string, unknown>, patch: Record<string, unknow
   return next;
 };
 
+const validateCrewSlot = (game: GameSession | null, characterId: string, slot: number): Character => {
+  if (!Number.isInteger(slot) || slot < 0 || slot >= 6) throw new Error('Invalid crew slot.');
+  const character = game?.characters.find((c) => c.id === characterId && c.playbook === 'marshal');
+  if (!character) throw new Error('Marshal character not found.');
+  return character;
+};
+
 export const useGame = (gameId: string): UseGameResult => {
   const store = useMemo(() => getGameSync(gameId), [gameId]);
   const { game, raw, loading, error } = useSyncExternalStore(store.subscribe, store.getDataSnapshot);
@@ -112,14 +119,8 @@ export const useGame = (gameId: string): UseGameResult => {
   const crewLinkPath = (characterId: string, slot: number): PathPart[] => [
     'characters', { id: characterId }, 'data', 'playbookFeatures', 'crewNpcLinks', String(slot),
   ];
-  const validateCrewSlot = (characterId: string, slot: number) => {
-    if (!Number.isInteger(slot) || slot < 0 || slot >= 6) throw new Error('Invalid crew slot.');
-    const character = game?.characters.find((c) => c.id === characterId && c.playbook === 'marshal');
-    if (!character) throw new Error('Marshal character not found.');
-    return character;
-  };
   const setCrewNpcLink = useCallback((characterId: string, slot: number, npcId: string | null) => {
-    const character = validateCrewSlot(characterId, slot);
+    const character = validateCrewSlot(game, characterId, slot);
     if (npcId !== null) {
       if (![...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])].some((npc) => npc.id === npcId)) {
         return Promise.reject(new Error('This Steading NPC no longer exists.'));
@@ -134,7 +135,7 @@ export const useGame = (gameId: string): UseGameResult => {
   }, [game, raw, edit]);
 
   const createCrewNpc = useCallback((characterId: string, slot: number, npc: SteadingNPC): Promise<void> => {
-    validateCrewSlot(characterId, slot);
+    validateCrewSlot(game, characterId, slot);
     if (!raw) return Promise.reject(new Error('Load this game before adding an NPC.'));
     if (!npc.id || !npc.name.trim()) return Promise.reject(new Error('Give this NPC a name.'));
     if ([...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])].some((n) => n.id === npc.id)) {
