@@ -20,10 +20,12 @@ import {
 } from "@/lib/resolvePlaybookFeatures";
 import { OptionSelect } from "../../sections/OptionSelect";
 import { toCustomSentinel } from "../../sections/OptionSelectUtils";
-import type { RadioOption, GameSession, SteadingNPC, SteadingNpcForm } from "@/types";
+import type { RadioOption, GameSession, SteadingNPC, SteadingNpcForm, NpcRelationship } from "@/types";
 import type { DropdownGroup } from "@/components/ui";
 import { NpcModal } from '@/components/gm-playbook/sections/SteadingNPCs/NpcModal';
-import { buildGroups } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
+import { NpcDetails } from '@/components/gm-playbook/sections/SteadingNPCs/NpcDetails';
+import { buildIncomingRelationships } from '@/components/gm-playbook/sections/SteadingNPCs/npcRelationships';
+import { buildGroups, buildNameMap } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
 import type { NpcFormState } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
 import {
   BACKGROUND_FORCED_MOVES,
@@ -189,8 +191,8 @@ const InventoryRow = memo(
 interface IndividualSlotProps {
   index: number;
   name: string;
-  linkedName?: string;
-  linkedTraits?: string;
+  linked: boolean;
+  npcDetails?: React.ReactNode;
   npcControls?: React.ReactNode;
   tag: string;
   traits: string;
@@ -203,7 +205,7 @@ interface IndividualSlotProps {
 }
 
 const IndividualSlot = memo(
-  ({ index, name, linkedName, linkedTraits, npcControls, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
+  ({ index, name, linked, npcDetails, npcControls, tag, traits, onChange, onBlur }: IndividualSlotProps) => {
     const handleName = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) =>
         onChange(index, "name", e.target.value),
@@ -221,41 +223,48 @@ const IndividualSlot = memo(
     );
 
     return (
-      <div className={styles.individual}>
-        <div className={styles.individualFields}>
+      <div className={styles.individual} role="group" aria-label={`Crew individual ${index + 1}`}>
+        {linked ? <>
+          {npcDetails}
+          {(name || tag || traits) && <details className={styles.originalIndividual}>
+            <summary>Original Crew entry</summary>
+            <Text size="xs" color="muted">Kept for reference; used again if unlinked.</Text>
+            {name && <Text size="xs">Name: {name}</Text>}
+            {tag && <Text size="xs">Tag: {tag}</Text>}
+            {traits && <Text size="xs">Traits: {traits}</Text>}
+          </details>}
+        </> : <>
+          <div className={styles.individualFields}>
+            <Input
+              className={styles.individualInput}
+              type="text"
+              value={name}
+              placeholder="Name"
+              aria-label={`Individual ${index + 1} name`}
+              onChange={handleName}
+              onBlur={onBlur}
+            />
+            <Input
+              className={styles.individualInput}
+              type="text"
+              value={tag}
+              placeholder="Tag"
+              aria-label={`Individual ${index + 1} tag`}
+              onChange={handleTag}
+              onBlur={onBlur}
+            />
+          </div>
           <Input
-            className={styles.individualInput}
-            type="text"
-            value={linkedName ?? name}
-            readOnly={linkedName !== undefined}
-            placeholder="Name"
-            aria-label={`Individual ${index + 1} name`}
-            title={linkedName !== undefined ? 'Edit the name through the linked Steading NPC' : undefined}
-            onChange={handleName}
-            onBlur={linkedName !== undefined ? undefined : onBlur}
-          />
-          <Input
-            className={styles.individualInput}
-            type="text"
-            value={tag}
-            placeholder="Tag"
-            aria-label={`Individual ${index + 1} tag`}
-            onChange={handleTag}
+            multiline
+            className={styles.individualTraits}
+            value={traits}
+            placeholder="Traits"
+            aria-label={`Individual ${index + 1} traits`}
+            rows={2}
+            onChange={handleTraits}
             onBlur={onBlur}
           />
-        </div>
-        <Input
-          multiline
-          className={styles.individualTraits}
-          value={linkedTraits ?? traits}
-          readOnly={linkedTraits !== undefined}
-          placeholder="Traits"
-          aria-label={`Individual ${index + 1} traits`}
-          title={linkedTraits !== undefined ? 'Edit traits through the linked Steading NPC' : undefined}
-          rows={2}
-          onChange={handleTraits}
-          onBlur={linkedTraits !== undefined ? undefined : onBlur}
-        />
+        </>}
         {npcControls}
       </div>
     );
@@ -383,6 +392,19 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLin
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [game.characters, game.steading?.residents, game.steading?.neighbors],
   );
+  const nameMap = useMemo(
+    () => buildNameMap(game),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [game.characters, game.steading?.residents, game.steading?.neighbors],
+  );
+  const resolveTarget = useCallback(
+    (rel: NpcRelationship) => nameMap.get(rel.targetId) ?? rel.targetId,
+    [nameMap],
+  );
+  const incomingRelationships = useMemo(
+    () => buildIncomingRelationships(game.steading?.residents, game.steading?.neighbors),
+    [game.steading?.residents, game.steading?.neighbors],
+  );
   const modalNpcId = npcModal ? npcLinks[String(npcModal.slot)] : undefined;
   const modalNpc = modalNpcId ? npcById.get(modalNpcId) : undefined;
   const modalGroups = modalNpc ? relationshipGroups
@@ -400,8 +422,10 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLin
       ? {
           name: individuals[npcModal.slot]?.name ?? '',
           pronouns: '', occupation: 'Soldier',
-          traits: individuals[npcModal.slot]?.traits.trim()
-            ? [individuals[npcModal.slot].traits.trim()] : [],
+          // Preserve free-form Crew text without guessing where one trait ends.
+          traits: [...new Set([
+            individuals[npcModal.slot]?.tag.trim(), individuals[npcModal.slot]?.traits.trim(),
+          ].filter((value): value is string => !!value))],
           relationships: [], notes: '',
         }
       : undefined;
@@ -870,66 +894,71 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLin
           tales, too serious, troubles at home, whistles, whittler
         </Text>
         <div className={styles.individualsGrid}>
-          {individuals.map((ind, i) => (
-            <IndividualSlot
-              key={`crew-individual-slot-${i}`}
-              index={i}
-              name={ind.name}
-              linkedName={npcById.get(npcLinks[String(i)] ?? '')?.name}
-              linkedTraits={npcById.get(npcLinks[String(i)] ?? '')
-                ? (npcById.get(npcLinks[String(i)] ?? '')?.traits ?? []).join(', ') : undefined}
-              tag={ind.tag}
-              traits={ind.traits}
-              onChange={handleIndividualChange}
-              onBlur={handleIndividualBlur}
-              npcControls={
-                <div className={styles.npcLink}>
-                  {npcLinks[String(i)] ? (
-                    <>
-                      <Text size="xs" color="muted">
-                        {npcById.has(npcLinks[String(i)])
-                          ? 'Linked to Steading NPC; name and relationships are shared.'
-                          : 'Linked NPC was removed. Unlink to choose another.'}
-                      </Text>
-                      <div className={styles.npcLinkActions}>
-                        {npcById.has(npcLinks[String(i)]) && (
-                          <Button variant="secondary" size="sm" disabled={linkBusy !== null}
-                            onClick={() => handleEditNpc(i)}
-                            aria-label={`Edit Steading NPC for individual ${i + 1}`}>
-                            Edit NPC
+          {individuals.map((ind, i) => {
+            const npcId = npcLinks[String(i)];
+            const npc = npcById.get(npcId ?? '');
+            const kind = game.steading?.residents?.some((resident) => resident.id === npcId) ? 'resident' : 'neighbor';
+            return (
+              <IndividualSlot
+                key={`crew-individual-slot-${i}`}
+                index={i}
+                name={ind.name}
+                linked={!!npcId}
+                npcDetails={npc && <NpcDetails npc={npc} resolveTarget={resolveTarget}
+                  incomingRelationships={incomingRelationships.get(`${kind}::${npc.id}`) ?? []} />}
+                tag={ind.tag}
+                traits={ind.traits}
+                onChange={handleIndividualChange}
+                onBlur={handleIndividualBlur}
+                npcControls={
+                  <div className={styles.npcLink}>
+                    {npcId ? (
+                      <>
+                        <Text size="xs" color="muted">
+                          {npc
+                            ? 'Shared with Steading. Edit NPC to update both views.'
+                            : 'Linked NPC was removed. Unlink to choose another.'}
+                        </Text>
+                        <div className={styles.npcLinkActions}>
+                          {npc && (
+                            <Button variant="secondary" size="sm" disabled={linkBusy !== null}
+                              onClick={() => handleEditNpc(i)}
+                              aria-label={`Edit Steading NPC for individual ${i + 1}`}>
+                              Edit NPC
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" disabled={linkBusy !== null}
+                            onClick={() => handleLinkNpc(i, null)}
+                            aria-label={`Unlink individual ${i + 1} from Steading NPC`}>
+                            Unlink
                           </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {npcGroups.length > 0 && (
+                          <Dropdown
+                            id={`crew-npc-${i}`}
+                            aria-label={`Link individual ${i + 1} to existing NPC`}
+                            value=""
+                            groups={npcGroups}
+                            onChange={(id) => handleLinkNpc(i, id)}
+                            disabled={linkBusy !== null}
+                            placeholder="Link existing NPC…"
+                          />
                         )}
-                        <Button variant="ghost" size="sm" disabled={linkBusy !== null}
-                          onClick={() => handleLinkNpc(i, null)}
-                          aria-label={`Unlink individual ${i + 1} from Steading NPC`}>
-                          Unlink
+                        <Button variant="secondary" size="sm" disabled={linkBusy !== null || !ind.name.trim()}
+                          onClick={() => handleCreateNpc(i)}
+                          aria-label={`Create Steading NPC from individual ${i + 1}`}>
+                          Create NPC
                         </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {npcGroups.length > 0 && (
-                        <Dropdown
-                          id={`crew-npc-${i}`}
-                          aria-label={`Link individual ${i + 1} to existing NPC`}
-                          value=""
-                          groups={npcGroups}
-                          onChange={(id) => handleLinkNpc(i, id)}
-                          disabled={linkBusy !== null}
-                          placeholder="Link existing NPC…"
-                        />
-                      )}
-                      <Button variant="secondary" size="sm" disabled={linkBusy !== null || !ind.name.trim()}
-                        onClick={() => handleCreateNpc(i)}
-                        aria-label={`Create Steading NPC from individual ${i + 1}`}>
-                        Create NPC
-                      </Button>
-                    </>
-                  )}
-                </div>
-              }
-            />
-          ))}
+                      </>
+                    )}
+                  </div>
+                }
+              />
+            );
+          })}
         </div>
       </PlaybookSection>
       {npcModal && modalInitial && (
