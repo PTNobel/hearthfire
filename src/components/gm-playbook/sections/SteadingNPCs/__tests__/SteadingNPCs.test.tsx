@@ -180,3 +180,22 @@ describe('SteadingNPCs relationships', () => {
     expect(card('Bram').queryByText(/mother/)).not.toBeInTheDocument();
   });
 });
+
+
+describe('shared individual Tag editing', () => {
+  it('can clear a Tag without changing traits, notes, or relationships', async () => {
+    const user = userEvent.setup();
+    const original = npc('a', { name: 'Alda', tag: 'rookie', traits: ['bald'],
+      notes: 'Green cloak.', relationships: [] });
+    renderSection([original]);
+    expect(screen.getByText('Tag: rookie')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Edit Alda' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByLabelText('Tag', { exact: true })).toHaveValue('rookie');
+    await user.clear(dialog.getByLabelText('Tag', { exact: true }));
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Save NPC' })).toBeEnabled());
+    await user.click(dialog.getByRole('button', { name: 'Save NPC' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(residentsFrom(onSave)[0]).toMatchObject({ ...original, tag: '' });
+  });
+});

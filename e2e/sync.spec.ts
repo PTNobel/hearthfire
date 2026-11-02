@@ -230,3 +230,78 @@ test('NPC relationships appear on both cards and can be filtered from either end
   await expect(page.getByRole('button', { name: 'Edit Bram', exact: true })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit Cora', exact: true })).not.toBeVisible();
 });
+
+test('converted Crew members share traits, descriptions, and relationships with Steading across tabs', async ({ context }, testInfo) => {
+  const crewTrait = 'Keeps a careful record of everyone who returns from the Wood';
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const ref = doc(ctx.firestore(), 'games', id);
+    const game = (await getDoc(ref)).data()!;
+    await setDoc(ref, { ...game, characters: [{
+      id: 'pc-a', name: 'The Marshal', playbook: 'marshal', level: 1,
+      data: { playbookFeatures: { crewIndividuals: [{ name: 'Mara', tag: 'brave', traits: crewTrait }] } },
+    }] });
+  });
+  await context.addInitScript((gameId) => localStorage.setItem('hearthfire:session-game-id', gameId), id);
+  const crew = await context.newPage();
+  const steading = await context.newPage();
+  await crew.goto('/game/marshal#crew');
+  await steading.goto('/game/steading#npcs');
+  await crew.getByRole('button', { name: 'Create Steading NPC from individual 1', exact: true }).click();
+  const form = crew.getByRole('dialog');
+  await expect(form.getByLabel('Tag', { exact: true })).toHaveValue('brave');
+  await expect(form.getByRole('button', { name: 'Remove trait: brave', exact: true })).toHaveCount(0);
+  await expect(form.getByRole('button', { name: `Remove trait: ${crewTrait}`, exact: true })).toBeVisible();
+  await form.getByLabel('Pronouns', { exact: true }).fill('she/her');
+  await form.getByLabel('Notes', { exact: true }).fill('Wears a green cloak.');
+  await form.getByRole('button', { name: 'Add relationship', exact: true }).click();
+  await form.getByLabel('Relationship 1 type', { exact: true }).fill('trusts');
+  await form.getByLabel('Relationship 1 linked character', { exact: true }).selectOption('resident::npc-a');
+  await form.getByRole('button', { name: 'Save NPC', exact: true }).click();
+  await expect(form).not.toBeVisible();
+  const crewCard = crew.getByRole('group', { name: 'Crew individual 1', exact: true });
+  const npcCard = steading.getByRole('listitem').filter({ has: steading.getByRole('button', { name: 'Edit Mara', exact: true }) });
+  for (const card of [crewCard, npcCard]) {
+    for (const text of ['Tag: brave', crewTrait, 'she/her', 'Soldier', 'Wears a green cloak.', 'Mara → NPC A: trusts']) {
+      await expect(card.getByRole('group', { name: 'NPC profile', exact: true }).getByText(text, { exact: true })).toBeVisible();
+    }
+  }
+  await steading.getByRole('button', { name: 'Edit Mara', exact: true }).click();
+  await steading.getByRole('dialog').getByLabel('Tag', { exact: true }).fill('sharp-eyed');
+  await steading.getByRole('dialog').getByLabel('Notes', { exact: true }).fill('The cloak is now blue.');
+  await steading.getByRole('dialog').getByRole('combobox', { name: 'Traits', exact: true }).fill('cautious');
+  await steading.getByRole('dialog').getByRole('combobox', { name: 'Traits', exact: true }).press('Enter');
+  await steading.getByRole('button', { name: 'Save NPC', exact: true }).click();
+  await expect(crewCard.getByText('The cloak is now blue.', { exact: true })).toBeVisible();
+  await expect(crewCard.getByText('cautious', { exact: true })).toBeVisible();
+  await expect(crewCard.getByText('Tag: sharp-eyed', { exact: true })).toBeVisible();
+  await crewCard.getByRole('button', { name: 'Edit Steading NPC for individual 1', exact: true }).click();
+  await form.getByLabel('Tag', { exact: true }).fill('rookie');
+  await form.getByLabel('Occupation', { exact: true }).fill('Scout');
+  await form.getByLabel('Notes', { exact: true }).fill('Watches the northern road.');
+  await form.getByRole('button', { name: 'Save NPC', exact: true }).click();
+  await expect(npcCard.getByText('Scout', { exact: true })).toBeVisible();
+  await expect(npcCard.getByText('Watches the northern road.', { exact: true })).toBeVisible();
+  const storedGame = () => getDoc(doc(env.unauthenticatedContext().firestore(), 'games', id));
+  await expect.poll(async () => (await storedGame()).data()?.steading.residents
+    .find((entry: { name: string }) => entry.name === 'Mara')?.notes).toBe('Watches the northern road.');
+  await crew.bringToFront();
+  await crew.reload();
+  // Reloading rebuilds the lazy playbook; wait for the app before checking data.
+  await expect(crewCard).toBeVisible({ timeout: 15_000 });
+  await expect(crewCard.getByText('Watches the northern road.', { exact: true })).toBeVisible();
+  const stored = (await storedGame()).data()!;
+  const npc = stored.steading.residents.find((entry: { name: string }) => entry.name === 'Mara');
+  expect(stored.steading.residents).toHaveLength(3);
+  expect(stored.characters[0].data.playbookFeatures.crewNpcLinks['0']).toBe(npc.id);
+  expect(npc.tag).toBe('rookie');
+  expect(npc.traits).toEqual([crewTrait, 'cautious']);
+  await expect(crewCard.getByText('Tag: rookie', { exact: true })).toBeVisible();
+  await expect(npcCard.getByText('Tag: rookie', { exact: true })).toBeVisible();
+  for (const width of [1280, 320]) {
+    await crew.setViewportSize({ width, height: 900 });
+    await crewCard.scrollIntoViewIfNeeded();
+    expect(await crewCard.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await crew.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await crewCard.screenshot({ path: testInfo.outputPath(`crew-npc-${width}.png`) });
+  }
+});

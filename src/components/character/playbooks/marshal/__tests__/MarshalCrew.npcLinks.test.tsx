@@ -9,13 +9,17 @@ vi.mock('@/components/app', () => toastModuleMock());
 import { MarshalCrew } from '../MarshalCrew';
 
 const resident: SteadingNPC = {
-  id: 'npc-1', name: 'Aled the Scout', occupation: 'Soldier', traits: ['fearless'],
-  relationships: [],
+  id: 'npc-1', name: 'Aled the Scout', occupation: 'Soldier', tag: 'sharp-eyed', traits: ['fearless'],
+  pronouns: 'they/them', notes: 'Keeps watch by the old bridge.',
+  relationships: [{ id: 'outgoing', targetId: 'npc-2', targetKind: 'neighbor', type: 'trusts' }],
 };
 
 const game: GameSession = {
   id: 'game-1', name: 'Stonetop', createdAt: 0, characters: [],
-  steading: { residents: [resident] },
+  steading: { residents: [resident], neighbors: [{
+    id: 'npc-2', name: 'Bryn',
+    relationships: [{ id: 'incoming', targetId: 'npc-1', targetKind: 'resident', type: 'owes a favor' }],
+  }] },
 };
 
 const crewData = (linked = false): CharacterData => ({
@@ -25,24 +29,16 @@ const crewData = (linked = false): CharacterData => ({
   },
 });
 
-const mount = (linked = false) => {
+const mount = (linked = false, initialGame = game, data = crewData(linked)) => {
   const onSave = vi.fn().mockResolvedValue(undefined);
   const onLinkNpc = vi.fn().mockResolvedValue(undefined);
   const onCreateNpc = vi.fn().mockResolvedValue(undefined);
   const onEditNpc = vi.fn().mockResolvedValue(undefined);
-  const view = render(
-    <MarshalCrew
-      data={crewData(linked)}
-      onSave={onSave}
-      game={game}
-      characterId="marshal-1"
-      prosperity={1}
-      onLinkNpc={onLinkNpc}
-      onCreateNpc={onCreateNpc}
-      onEditNpc={onEditNpc}
-    />,
-  );
-  return { ...view, onSave, onLinkNpc, onCreateNpc, onEditNpc };
+  const props = { data, onSave, characterId: 'marshal-1', prosperity: 1, onLinkNpc, onCreateNpc, onEditNpc };
+  const view = render(<MarshalCrew {...props} game={initialGame} />);
+  return { ...view, onSave, onLinkNpc, onCreateNpc, onEditNpc,
+    updateGame: (next: GameSession) => view.rerender(<MarshalCrew {...props} game={next} />),
+  };
 };
 
 describe('Marshal crew and shared Steading NPCs', () => {
@@ -55,27 +51,32 @@ describe('Marshal crew and shared Steading NPCs', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('displays the shared NPC name and edits the Steading record', async () => {
+  it('displays the full shared NPC profile and edits the Steading record', async () => {
     const user = userEvent.setup();
     const { onEditNpc, onLinkNpc } = mount(true);
-    const nameInput = screen.getByRole('textbox', { name: 'Individual 1 name' });
-    expect(nameInput).toHaveValue('Aled the Scout');
-    expect(nameInput).toHaveAttribute('readonly');
-    const traitsInput = screen.getByRole('textbox', { name: 'Individual 1 traits' });
-    expect(traitsInput).toHaveValue('fearless');
-    expect(traitsInput).toHaveAttribute('readonly');
+    const card = within(screen.getByRole('group', { name: 'Crew individual 1' }));
+    for (const text of ['Aled the Scout', 'they/them', 'Soldier', 'Tag: sharp-eyed', 'fearless',
+      'Keeps watch by the old bridge.', 'Aled the Scout → Bryn: trusts', 'Bryn → Aled the Scout: owes a favor']) {
+      expect(card.getByText(text)).toBeVisible();
+    }
+    expect(card.queryByRole('textbox')).not.toBeInTheDocument();
+    await user.click(card.getByText('Original Crew entry'));
+    expect(card.getByText('Tag: brave')).toBeVisible();
+    expect(card.getByText('Traits: a scout')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Edit Steading NPC for individual 1' }));
     const dialog = screen.getByRole('dialog');
     const modalName = within(dialog).getByRole('textbox', { name: /^Name/ });
     await user.clear(modalName);
     await user.type(modalName, 'Aled of Stonetop');
+    await user.clear(within(dialog).getByRole('textbox', { name: 'Notes' }));
+    await user.type(within(dialog).getByRole('textbox', { name: 'Notes' }), 'Now watches the gate.');
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Save NPC' })).toBeEnabled());
     await user.click(within(dialog).getByRole('button', { name: 'Save NPC' }));
 
     await waitFor(() => expect(onEditNpc).toHaveBeenCalledWith(
       'npc-1', expect.objectContaining({ name: 'Aled the Scout' }),
-      expect.objectContaining({ name: 'Aled of Stonetop' }),
+      expect.objectContaining({ name: 'Aled of Stonetop', notes: 'Now watches the gate.', traits: ['fearless'] }),
     ));
     expect(onLinkNpc).not.toHaveBeenCalled();
   });
@@ -91,8 +92,83 @@ describe('Marshal crew and shared Steading NPCs', () => {
     await waitFor(() => expect(onCreateNpc).toHaveBeenCalledTimes(1));
     expect(onCreateNpc.mock.calls[0][0]).toBe(0);
     expect(onCreateNpc.mock.calls[0][1]).toMatchObject({
-      name: 'Mara', occupation: 'Soldier', traits: ['a scout'],
+      name: 'Mara', occupation: 'Soldier', tag: 'brave', traits: ['a scout'],
     });
     expect(onCreateNpc.mock.calls[0][1].id).toBeTruthy();
+  });
+
+  it('reflects remote NPC edits and relationship removals without writing a Crew copy', () => {
+    const { updateGame, onSave, onEditNpc } = mount(true);
+    updateGame({ ...game, steading: { residents: [{ ...resident,
+      name: 'Aled of Stonetop', notes: 'Back from the Wood.', traits: ['cautious'], dead: true,
+    }], neighbors: [{ id: 'npc-2', name: 'Bryn the Weaver' }] } });
+    const card = within(screen.getByRole('group', { name: 'Crew individual 1' }));
+    for (const text of ['Aled of Stonetop', 'Back from the Wood.', 'cautious', '(DEAD)',
+      'Aled of Stonetop → Bryn the Weaver: trusts']) expect(card.getByText(text)).toBeVisible();
+    expect(card.queryByText('fearless')).not.toBeInTheDocument();
+    expect(card.queryByText(/owes a favor/)).not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onEditNpc).not.toHaveBeenCalled();
+  });
+
+  it('shows incoming relationships for a linked neighbor too', () => {
+    const data = crewData(true);
+    data.playbookFeatures!.crewNpcLinks = { '0': 'npc-2' };
+    mount(true, game, data);
+    const card = within(screen.getByRole('group', { name: 'Crew individual 1' }));
+    expect(card.getByText('Aled the Scout → Bryn: trusts')).toBeVisible();
+    expect(card.getByText('Bryn → Aled the Scout: owes a favor')).toBeVisible();
+  });
+
+  it('marks a deleted linked NPC as missing instead of showing the original Crew entry as current', async () => {
+    const user = userEvent.setup();
+    const { onLinkNpc } = mount(true, { ...game, steading: {} });
+    const card = within(screen.getByRole('group', { name: 'Crew individual 1' }));
+    expect(card.getByText('Linked NPC was removed. Unlink to choose another.')).toBeVisible();
+    expect(card.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(card.queryByRole('button', { name: /Edit Steading NPC/ })).not.toBeInTheDocument();
+    await user.click(card.getByRole('button', { name: 'Unlink individual 1 from Steading NPC' }));
+    expect(onLinkNpc).toHaveBeenCalledWith(0, null);
+  });
+
+  it('preserves equal Tag and trait text as separate fields without splitting descriptive text', async () => {
+    const user = userEvent.setup();
+    const data = crewData();
+    data.playbookFeatures!.crewIndividuals = [{ name: 'Mara', tag: ' brave, loyal ', traits: 'brave, loyal' }];
+    const { onCreateNpc } = mount(false, game, data);
+    await user.click(screen.getByRole('button', { name: 'Create Steading NPC from individual 1' }));
+    const save = within(screen.getByRole('dialog')).getByRole('button', { name: 'Save NPC' });
+    await waitFor(() => expect(save).toBeEnabled());
+    await user.click(save);
+    await waitFor(() => expect(onCreateNpc).toHaveBeenCalledTimes(1));
+    expect(onCreateNpc.mock.calls[0][1].tag).toBe('brave, loyal');
+    expect(onCreateNpc.mock.calls[0][1].traits).toEqual(['brave, loyal']);
+  });
+});
+
+
+describe('existing Crew conversions', () => {
+  it.each([undefined, ''])('does not backfill an absent or cleared shared Tag (%s)', async (tag) => {
+    const user = userEvent.setup();
+    const legacyNpc = { ...resident, tag };
+    const legacyGame = { ...game, steading: { ...game.steading, residents: [legacyNpc] } };
+    const { onEditNpc, onSave } = mount(true, legacyGame);
+    const card = within(screen.getByRole('group', { name: 'Crew individual 1' }));
+    expect(card.queryByText('Tag: brave')).not.toBeVisible();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onEditNpc).not.toHaveBeenCalled();
+    await user.click(card.getByText('Original Crew entry'));
+    expect(card.getByText('Tag: brave')).toBeVisible();
+    await user.click(card.getByRole('button', { name: 'Edit Steading NPC for individual 1' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByLabelText('Tag', { exact: true })).toHaveValue('');
+    await user.type(dialog.getByLabelText('Tag', { exact: true }), 'brave');
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Save NPC' })).toBeEnabled());
+    await user.click(dialog.getByRole('button', { name: 'Save NPC' }));
+    await waitFor(() => expect(onEditNpc).toHaveBeenCalledWith('npc-1',
+      expect.objectContaining({ tag }),
+      expect.objectContaining({ tag: 'brave', traits: resident.traits, notes: resident.notes,
+        relationships: resident.relationships })));
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

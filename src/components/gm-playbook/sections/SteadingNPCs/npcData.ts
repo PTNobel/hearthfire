@@ -47,6 +47,7 @@ export const EMPTY_FORM: NpcFormState = {
   name: '',
   pronouns: '',
   occupation: '',
+  tag: '',
   traits: [],
   relationships: [],
   notes: '',

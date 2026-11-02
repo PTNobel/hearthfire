@@ -42,6 +42,7 @@ export const nodeHoverDetails = (
   const facts = [
     npc?.pronouns || '',
     npc?.occupation || '',
+    npc?.tag ? `Tag: ${npc.tag}` : '',
     node.dead ? 'Deceased' : '',
     crewOwner ? `Marshal's Crew (${crewOwner.name || 'Marshal'})` : '',
     ...(npc?.traits ?? []),

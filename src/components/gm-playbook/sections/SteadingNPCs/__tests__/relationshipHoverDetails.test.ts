@@ -10,7 +10,7 @@ const game: GameSession = {
   } }],
   steading: { residents: [
     {
-      id: 'guard', name: 'Ffion', occupation: 'Soldier', traits: ['fearless'],
+      id: 'guard', name: 'Ffion', occupation: 'Soldier', tag: 'rookie', traits: ['fearless'],
       relationships: [{ id: 'rel-a', type: 'friend', targetKind: 'resident', targetId: 'healer' }],
     },
     {
@@ -25,7 +25,7 @@ describe('relationship hover details', () => {
     const graph = buildRelationshipGraph(game, 960, 600);
     expect(nodeHoverDetails(game, graph, 'guard')).toMatchObject({
       title: 'Ffion', category: 'Stonetop resident',
-      facts: expect.arrayContaining(['Soldier', 'fearless', "Marshal's Crew (Ada)"]),
+      facts: expect.arrayContaining(['Soldier', 'Tag: rookie', 'fearless', "Marshal's Crew (Ada)"]),
       connections: ['Ffion → Eira: friend'],
     });
   });
@@ -36,6 +36,23 @@ describe('relationship hover details', () => {
     expect(pc?.category).toBe('Player character');
     expect(pc?.connections).toContain('Eira → Ada (The Marshal): sibling');
     expect(edgeHoverDetails(graph, 'rel-a')?.category).toBe('Ffion → Eira: friend');
+  });
+
+  it('keeps Tag separate from equal trait text and omits absent or cleared Tags', () => {
+    const residents = game.steading!.residents!;
+    const tagged = { ...game, steading: { residents: [
+      { ...residents[0], tag: 'fearless' }, residents[1],
+    ] } };
+    const graph = buildRelationshipGraph(tagged, 960, 600);
+    expect(nodeHoverDetails(tagged, graph, 'guard')?.facts)
+      .toEqual(expect.arrayContaining(['Tag: fearless', 'fearless']));
+    expect(nodeHoverDetails(tagged, graph, 'healer')?.facts.some((fact) => fact.startsWith('Tag:'))).toBe(false);
+    const cleared = { ...tagged, steading: { residents: [
+      { ...tagged.steading.residents[0], tag: '' }, residents[1],
+    ] } };
+    const facts = nodeHoverDetails(cleared, graph, 'guard')?.facts;
+    expect(facts).toContain('fearless');
+    expect(facts?.some((fact) => fact.startsWith('Tag:'))).toBe(false);
   });
 
   it('ignores disconnected/missing nodes without fabricating facts', () => {

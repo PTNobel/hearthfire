@@ -25,13 +25,15 @@ export interface SteadingNPC {
   name: string;
   pronouns?: string;
   occupation?: string;
+  // The individual's Tag is distinct from descriptive traits and collective Crew tags.
+  tag?: string;
   traits?: string[];
   relationships?: NpcRelationship[];
   notes?: string;
   dead?: boolean;
 }
 
-export type SteadingNpcForm = Required<Pick<SteadingNPC, 'name' | 'pronouns' | 'occupation' | 'traits' | 'relationships' | 'notes'>>;
+export type SteadingNpcForm = Required<Pick<SteadingNPC, 'name' | 'pronouns' | 'occupation' | 'traits' | 'relationships' | 'notes'>> & Pick<SteadingNPC, 'tag'>;
 
 export type SteadingSize = 'hamlet' | 'village' | 'town' | 'city';
 

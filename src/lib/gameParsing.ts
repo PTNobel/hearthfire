@@ -146,6 +146,7 @@ const parseNpc = (v: unknown): SteadingNPC | null => {
     name: v.name,
     pronouns: isString(v.pronouns) ? v.pronouns : undefined,
     occupation: isString(v.occupation) ? v.occupation : undefined,
+    tag: isString(v.tag) ? v.tag : undefined,
     traits: filterByType(v.traits, isString),
     relationships: filterByType(v.relationships, isNpcRelationship),
     notes: isString(v.notes) ? v.notes : undefined,
