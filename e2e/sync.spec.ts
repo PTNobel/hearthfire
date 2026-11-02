@@ -248,7 +248,8 @@ test('converted Crew members share traits, descriptions, and relationships with 
   await steading.goto('/game/steading#npcs');
   await crew.getByRole('button', { name: 'Create Steading NPC from individual 1', exact: true }).click();
   const form = crew.getByRole('dialog');
-  await expect(form.getByRole('button', { name: 'Remove trait: brave', exact: true })).toBeVisible();
+  await expect(form.getByLabel('Tag', { exact: true })).toHaveValue('brave');
+  await expect(form.getByRole('button', { name: 'Remove trait: brave', exact: true })).toHaveCount(0);
   await expect(form.getByRole('button', { name: `Remove trait: ${crewTrait}`, exact: true })).toBeVisible();
   await form.getByLabel('Pronouns', { exact: true }).fill('she/her');
   await form.getByLabel('Notes', { exact: true }).fill('Wears a green cloak.');
@@ -260,18 +261,21 @@ test('converted Crew members share traits, descriptions, and relationships with 
   const crewCard = crew.getByRole('group', { name: 'Crew individual 1', exact: true });
   const npcCard = steading.getByRole('listitem').filter({ has: steading.getByRole('button', { name: 'Edit Mara', exact: true }) });
   for (const card of [crewCard, npcCard]) {
-    for (const text of ['brave', crewTrait, 'she/her', 'Soldier', 'Wears a green cloak.', 'Mara → NPC A: trusts']) {
-      await expect(card.getByText(text, { exact: true })).toBeVisible();
+    for (const text of ['Tag: brave', crewTrait, 'she/her', 'Soldier', 'Wears a green cloak.', 'Mara → NPC A: trusts']) {
+      await expect(card.getByRole('group', { name: 'NPC profile', exact: true }).getByText(text, { exact: true })).toBeVisible();
     }
   }
   await steading.getByRole('button', { name: 'Edit Mara', exact: true }).click();
+  await steading.getByRole('dialog').getByLabel('Tag', { exact: true }).fill('sharp-eyed');
   await steading.getByRole('dialog').getByLabel('Notes', { exact: true }).fill('The cloak is now blue.');
   await steading.getByRole('dialog').getByRole('combobox', { name: 'Traits', exact: true }).fill('cautious');
   await steading.getByRole('dialog').getByRole('combobox', { name: 'Traits', exact: true }).press('Enter');
   await steading.getByRole('button', { name: 'Save NPC', exact: true }).click();
   await expect(crewCard.getByText('The cloak is now blue.', { exact: true })).toBeVisible();
   await expect(crewCard.getByText('cautious', { exact: true })).toBeVisible();
+  await expect(crewCard.getByText('Tag: sharp-eyed', { exact: true })).toBeVisible();
   await crewCard.getByRole('button', { name: 'Edit Steading NPC for individual 1', exact: true }).click();
+  await form.getByLabel('Tag', { exact: true }).fill('rookie');
   await form.getByLabel('Occupation', { exact: true }).fill('Scout');
   await form.getByLabel('Notes', { exact: true }).fill('Watches the northern road.');
   await form.getByRole('button', { name: 'Save NPC', exact: true }).click();
@@ -289,7 +293,10 @@ test('converted Crew members share traits, descriptions, and relationships with 
   const npc = stored.steading.residents.find((entry: { name: string }) => entry.name === 'Mara');
   expect(stored.steading.residents).toHaveLength(3);
   expect(stored.characters[0].data.playbookFeatures.crewNpcLinks['0']).toBe(npc.id);
-  expect(npc.traits).toEqual(['brave', crewTrait, 'cautious']);
+  expect(npc.tag).toBe('rookie');
+  expect(npc.traits).toEqual([crewTrait, 'cautious']);
+  await expect(crewCard.getByText('Tag: rookie', { exact: true })).toBeVisible();
+  await expect(npcCard.getByText('Tag: rookie', { exact: true })).toBeVisible();
   for (const width of [1280, 320]) {
     await crew.setViewportSize({ width, height: 900 });
     await crewCard.scrollIntoViewIfNeeded();

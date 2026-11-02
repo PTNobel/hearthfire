@@ -13,7 +13,7 @@ let sequence = 0;
 let id = '';
 const form = {
   name: 'Mara', pronouns: 'she/her', occupation: 'Soldier',
-  traits: ['brave'], relationships: [], notes: '',
+  tag: 'rookie', traits: ['bald'], relationships: [], notes: '',
 };
 
 beforeEach(async () => {
@@ -98,5 +98,30 @@ describe('Marshal Crew NPC links', () => {
     await act(async () => { await result.current.setCrewNpcLink('marshal', 0, 'resident-1'); });
     await expect(result.current.setCrewNpcLink('marshal', 1, 'resident-1'))
       .rejects.toThrow('already linked');
+  });
+});
+
+
+describe('shared NPC Tag persistence', () => {
+  it('sets and clears a legacy NPC Tag without changing existing profile fields', async () => {
+    const original = { ...form, tag: undefined };
+    firestoreStore.set('games/' + id, {
+      id, name: 'Test Game', createdAt: 0, characters: [],
+      steading: { residents: [{ ...original, id: 'resident-1' }] },
+    });
+    const { result } = await mount();
+    const before = { ...original };
+    await act(async () => {
+      await result.current.updateCrewNpc('resident-1', before, { ...before, tag: 'rookie' });
+    });
+    await commit();
+    expect((firestoreStore.get('games/' + id)!.steading as { residents: unknown[] }).residents[0])
+      .toMatchObject({ ...form, id: 'resident-1' });
+    await act(async () => {
+      await result.current.updateCrewNpc('resident-1', { ...before, tag: 'rookie' }, { ...before, tag: '' });
+    });
+    await commit();
+    expect((firestoreStore.get('games/' + id)!.steading as { residents: unknown[] }).residents[0])
+      .toMatchObject({ ...form, id: 'resident-1', tag: '' });
   });
 });

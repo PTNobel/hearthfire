@@ -228,7 +228,7 @@ const IndividualSlot = memo(
           {npcDetails}
           {(name || tag || traits) && <details className={styles.originalIndividual}>
             <summary>Original Crew entry</summary>
-            <Text size="xs" color="muted">Kept for reference; used again if unlinked.</Text>
+            <Text size="xs" color="muted">Kept for reference; used again if unlinked. To carry an original Tag into the shared profile, use Edit NPC and enter it in Tag.</Text>
             {name && <Text size="xs">Name: {name}</Text>}
             {tag && <Text size="xs">Tag: {tag}</Text>}
             {traits && <Text size="xs">Traits: {traits}</Text>}
@@ -415,17 +415,17 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLin
   const modalInitial: NpcFormState | undefined = npcModal?.mode === 'edit' && modalNpc
     ? {
         name: modalNpc.name, pronouns: modalNpc.pronouns ?? '',
-        occupation: modalNpc.occupation ?? '', traits: modalNpc.traits ?? [],
+        occupation: modalNpc.occupation ?? '', tag: modalNpc.tag, traits: modalNpc.traits ?? [],
         relationships: modalNpc.relationships ?? [], notes: modalNpc.notes ?? '',
       }
     : npcModal?.mode === 'create'
       ? {
           name: individuals[npcModal.slot]?.name ?? '',
           pronouns: '', occupation: 'Soldier',
-          // Preserve free-form Crew text without guessing where one trait ends.
-          traits: [...new Set([
-            individuals[npcModal.slot]?.tag.trim(), individuals[npcModal.slot]?.traits.trim(),
-          ].filter((value): value is string => !!value))],
+          tag: individuals[npcModal.slot]?.tag.trim() ?? '',
+          // Preserve free-form Crew text without mixing in its separate Tag.
+          traits: individuals[npcModal.slot]?.traits.trim()
+            ? [individuals[npcModal.slot].traits.trim()] : [],
           relationships: [], notes: '',
         }
       : undefined;

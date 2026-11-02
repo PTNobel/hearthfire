@@ -24,13 +24,14 @@ export const NpcDetails = ({ npc, resolveTarget, incomingRelationships }: NpcDet
       key: `incoming:${source.id}:${relationship.id}`, label: relationshipLabel(source.name, relationship, npc.name),
     })),
   ].filter(({ label }) => label);
-  return <div className={styles.npcDetails}>
+  return <div className={styles.npcDetails} role="group" aria-label="NPC profile">
     <Text as="span" className={styles.npcName}>
       <span className={nameCx}>{npc.name}</span>
       {npc.dead && <Text as="span" className={styles.npcDeadLabel}>(DEAD)</Text>}
       {npc.pronouns && <span className={styles.npcPronouns}>{npc.pronouns}</span>}
     </Text>
     {npc.occupation && <Text as="span" size="xs" color="muted" italic>{npc.occupation}</Text>}
+    {npc.tag && <Text as="span" size="xs">Tag: {npc.tag}</Text>}
     {!!npc.traits?.length && <div className={styles.npcTraits}>
       {npc.traits.map((trait) => <span key={trait} className={styles.npcTrait}>{trait}</span>)}
     </div>}

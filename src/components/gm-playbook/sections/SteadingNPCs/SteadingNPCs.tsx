@@ -31,6 +31,7 @@ const npcToForm = (npc: SteadingNPC): NpcFormState => ({
   name: npc.name,
   pronouns: npc.pronouns ?? '',
   occupation: npc.occupation ?? '',
+  tag: npc.tag,
   traits: npc.traits ?? [],
   relationships: npc.relationships ?? [],
   notes: npc.notes ?? '',

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDiceRolls } from '../gameParsing';
+import { parseDiceRolls, parseSteading } from '../gameParsing';
 
 const base = {
   id: 'r1',
@@ -26,5 +26,21 @@ describe('parseDiceRolls', () => {
     const [roll] = parseDiceRolls([base]) ?? [];
     expect(roll).not.toHaveProperty('notation');
     expect(roll).not.toHaveProperty('breakdown');
+  });
+});
+
+
+describe('NPC individual Tags', () => {
+  it('parses Tags independently of traits and notes, including a deliberately cleared Tag', () => {
+    const residents = parseSteading({ residents: [
+      { id: 'a', name: 'Alda', tag: 'rookie', traits: ['bald'], notes: 'Green cloak.' },
+      { id: 'b', name: 'Bram', tag: '', traits: ['rookie'] },
+      { id: 'c', name: 'Cora', tag: 123 },
+      { id: 'd', name: 'Dara' },
+    ] })?.residents;
+    expect(residents?.[0]).toMatchObject({ tag: 'rookie', traits: ['bald'], notes: 'Green cloak.' });
+    expect(residents?.[1]).toMatchObject({ tag: '', traits: ['rookie'] });
+    expect(residents?.[2].tag).toBeUndefined();
+    expect(residents?.[3].tag).toBeUndefined();
   });
 });

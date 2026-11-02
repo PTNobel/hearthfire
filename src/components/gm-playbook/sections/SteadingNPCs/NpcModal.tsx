@@ -43,6 +43,10 @@ export const NpcModal = ({ open, onClose, onSave, initial = EMPTY_FORM, title, r
     setForm((f) => ({ ...f, notes: e.target.value }));
   }, [setForm]);
 
+  const handleTagChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((f) => ({ ...f, tag: e.target.value }));
+  }, [setForm]);
+
   const handleTraitsChange = useCallback((traits: string[]) => {
     setForm((f) => ({ ...f, traits }));
   }, [setForm]);
@@ -84,6 +88,7 @@ export const NpcModal = ({ open, onClose, onSave, initial = EMPTY_FORM, title, r
         </div>
         <Input label="Pronouns" value={form.pronouns} onChange={handlePronounsChange} placeholder="e.g. she/her" />
         <Input label="Occupation" value={form.occupation} onChange={handleOccupationChange} placeholder="e.g. farmer, smith, midwife" />
+        <Input label="Tag" value={form.tag ?? ''} onChange={handleTagChange} placeholder="Individual Tag (separate from traits)" />
         <TagInput
           label="Traits"
           value={form.traits}
