@@ -57,6 +57,31 @@ const syncWrite = async (accepted: Promise<void>) => {
 const renderGame = () => renderHook(() => useGame('g1'));
 
 describe('useGame mutations', () => {
+  it('still preserves a real competing NPC notes edit for review', async () => {
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0, characters: [], steading: { residents: [{ id: 'npc-1', name: 'Mara', notes: 'Other editor' }] } });
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const before = { name: 'Mara', pronouns: '', occupation: '', tag: '', traits: [], relationships: [], notes: '' };
+    await act(async () => {
+      await result.current.updateCrewNpc('npc-1', before, { ...before, notes: 'My edit' });
+      await getGameSync('g1').send();
+    });
+    expect((await changeQueue('g1')).conflict).toBeDefined();
+    expect(result.current.game?.steading?.residents?.[0].notes).toBe('My edit');
+    const stored = firestoreStore.get(GAME_PATH)?.steading as { residents: { notes: string }[] };
+    expect(stored.residents[0].notes).toBe('Other editor');
+  });
+  it('edits missing optional NPC fields without false conflicts or saving untouched defaults', async () => {
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0, characters: [], steading: { residents: [{ id: 'npc-1', name: 'Mara' }] } });
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const before = { name: 'Mara', pronouns: '', occupation: '', tag: '', traits: [], relationships: [], notes: '' };
+    await act(async () => { await syncWrite(result.current.updateCrewNpc('npc-1', before, { ...before, notes: 'Carries a lantern.', traits: ['brave'] })); });
+    expect(result.current.game?.steading?.residents?.[0]).toMatchObject({ id: 'npc-1', notes: 'Carries a lantern.', traits: ['brave'] });
+    const stored = firestoreStore.get(GAME_PATH)?.steading as { residents: Record<string, unknown>[] };
+    expect(stored.residents[0]).not.toHaveProperty('pronouns');
+    expect(stored.residents[0]).not.toHaveProperty('occupation');
+  });
   it('creates and links a follower NPC in one durable batch without changing follower stats', async () => {
     const follower = { id: 'f-1', name: 'Mara', hp: '4', loyalty: 2 };
     firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0,

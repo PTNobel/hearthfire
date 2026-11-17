@@ -174,8 +174,15 @@ export const useGame = (gameId: string): UseGameResult => {
     const section = game?.steading?.residents?.some((npc) => npc.id === npcId) ? 'residents'
       : game?.steading?.neighbors?.some((npc) => npc.id === npcId) ? 'neighbors' : null;
     if (!section) return Promise.reject(new Error('This Steading NPC no longer exists.'));
-    return edit(['steading', section, { id: npcId }], before, after, 'NPC details');
-  }, [game, edit]);
+    if (!raw) return Promise.reject(new Error('Load this game before editing.'));
+    // The NPC form displays absent optional fields as empty strings/arrays.
+    // Compare changed fields with their stored baseline, without writing
+    // untouched form defaults or treating a first edit as a competing change.
+    const changes = diffValues(before, after, ['steading', section, { id: npcId }]).map((change) =>
+      readPath(raw, change.path) === undefined && (change.before === '' || sameValue(change.before, []))
+        ? { ...change, before: undefined } : change);
+    return store.enqueue(raw, changes, 'NPC details');
+  }, [game, raw, store]);
 
   const logRoll = useCallback((roll: LoggedRoll) => {
     const existing = game?.diceRolls?.find((r) => r.id === roll.id);
