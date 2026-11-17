@@ -13,9 +13,10 @@ import { OtherThingsField } from './OtherThingsField';
 
 interface InventoryProps extends PlaybookSectionProps {
   prosperity: number;
+  showProsperity?: boolean;
 }
 
-export const Inventory = ({ data, prosperity, onSave }: InventoryProps) => {
+export const Inventory = ({ data, prosperity, onSave, showProsperity = true }: InventoryProps) => {
   const onSaveRef = useLatest(onSave);
 
   const { value: inventoryChecked, ref: inventoryCheckedRef, save: saveInventoryChecked } = useCharacterField('inventoryChecked', data?.inventoryChecked ?? {}, onSave, 'Failed to save.');
@@ -111,7 +112,7 @@ export const Inventory = ({ data, prosperity, onSave }: InventoryProps) => {
           onSaveSmallCustom={handleSaveSmallCustom}
         />
 
-        <ProsperitySection prosperity={prosperity} />
+        {showProsperity && <ProsperitySection prosperity={prosperity} />}
       </>}
     />
   );

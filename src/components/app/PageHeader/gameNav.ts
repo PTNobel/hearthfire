@@ -38,6 +38,7 @@ export const buildGameNav = (game: GameSession, current: string): GameNav => {
   // Steading lead, then the party characters.
   const groups: DropdownGroup<string>[] = [
     { label: 'Overview', options: [{ value: base, label: 'Party Overview' }] },
+    { label: 'Planning', options: [{ value: `${base}/inventory`, label: 'Shared Inventory' }] },
     {
       label: 'Playbooks',
       options: [

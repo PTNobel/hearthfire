@@ -310,6 +310,11 @@ const GameContent = ({
 
           <div className={styles.sectionRight}>
             <div className={styles.section}>
+              <Heading as="h2" size="label">Shared Inventory</Heading>
+              <Text size="sm" color="muted">Plan party gear, supplies, and who carries what.</Text>
+              <Button as={Link} to="/game/inventory" variant="secondary" size="xl" fullWidth>Open Shared Inventory</Button>
+            </div>
+            <div className={styles.section}>
               <Heading as="h2" size="label">Stonetop</Heading>
               <Button as={Link} to="/game/steading" variant="secondary" size="xl" fullWidth>Open Steading Playbook</Button>
             </div>

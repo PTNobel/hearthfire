@@ -1,0 +1,33 @@
+.root, .card, .gear, .summary, .companions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  min-width: 0;
+}
+
+.root {
+  gap: var(--spacing-6);
+}
+
+.card {
+  padding: var(--spacing-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel);
+  overflow-wrap: anywhere;
+}
+
+.summary {
+  margin: 0;
+  padding-left: var(--spacing-5);
+  gap: var(--spacing-1);
+}
+
+.companions {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--spacing-4);
+}
+
+.filter {
+  max-width: 24rem;
+}

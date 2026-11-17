@@ -37,9 +37,10 @@ import { StatBox, LoyaltyRow, CustomItemsGrid } from "../shared/CrewWidgets";
 import type { PlaybookSectionProps } from "@/types";
 import styles from "./MarshalCrew.module.css";
 
+import { CREW_INVENTORY_ITEMS as INVENTORY_ITEMS, CREW_SIZE, type CrewInventoryItem as InventoryItem } from "./crewInventoryData";
+
 const CREW_HP_BASE = 6;
 const CREW_DAMAGE_DICE = ["d6", "d8", "d10"] as const;
-const CREW_SIZE = 6;
 
 const TAG_ITEMS = [
   { id: "archers", label: "archers" },
@@ -114,32 +115,6 @@ const COST_OPTIONS: RadioOption[] = [
     value: "Wealth gained for themselves or Stonetop",
     label: "Wealth gained for themselves or Stonetop",
     description: "",
-  },
-];
-
-interface InventoryItem {
-  id: string;
-  label: string;
-  weight?: 1 | 2;
-}
-
-const INVENTORY_ITEMS: InventoryItem[] = [
-  { id: "hatchet", label: "**Hatchet**, iron *(hand, thrown, x piercing)*" },
-  { id: "spear", label: "**Spear**, iron *(close, thrown, x piercing)*" },
-  {
-    id: "bow",
-    label: "**Bow & iron arrows** *(near, x piercing, ○ low ammo, ○ all out)*",
-  },
-  {
-    id: "shield",
-    label: "**Shield** *(+1 armor, +1 Readiness on a 7+ to Defend)*",
-    weight: 2,
-  },
-  { id: "hides", label: "**Thick hides** *(1 armor, warm)*", weight: 2 },
-  { id: "cloak", label: "**Cloak** *(warm)*" },
-  {
-    id: "supplies",
-    label: "**Supplies** *(4+Prosperity uses per crew member)*",
   },
 ];
 

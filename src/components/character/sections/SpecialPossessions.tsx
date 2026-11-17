@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react';
 import { useLatest } from '@/hooks/useLatest';
 import { useCharacterField } from '@/hooks/useCharacterField';
 import { useDebouncedTextField } from '@/hooks/useDebouncedTextField';
@@ -32,6 +32,7 @@ const subItemKey = (possessionId: string, item: PossessionSubItem, idx: number):
 interface SubItemProps {
   item: PossessionSubItem;
   possessionId: string;
+  radioGroup: string;
   idx: number;
   parentChecked: boolean;
   selectOne: boolean;
@@ -43,7 +44,7 @@ interface SubItemProps {
   onUses: (id: string, count: number) => void;
 }
 
-const SubItem = ({ item, possessionId, idx, parentChecked, selectOne, atSubMax, selected, uses, onToggle, onRadioSelect, onUses }: SubItemProps) => {
+const SubItem = ({ item, possessionId, radioGroup, idx, parentChecked, selectOne, atSubMax, selected, uses, onToggle, onRadioSelect, onUses }: SubItemProps) => {
   const liCx = clsx(styles.subItem, styles.subItemSelectable);
 
   if (typeof item === 'string') {
@@ -63,7 +64,7 @@ const SubItem = ({ item, possessionId, idx, parentChecked, selectOne, atSubMax, 
       return (
         <li className={liCx}>
           <Radio
-            name={possessionId}
+            name={radioGroup}
             checked={subChecked}
             disabled={!parentChecked}
             onChange={() => onRadioSelect(possessionId, key)}
@@ -123,6 +124,7 @@ interface PossessionLabelProps {
 }
 
 const PossessionLabel = ({ p, checked, selected, uses, onToggle, onRadioSelect, onUses, renderExtra }: PossessionLabelProps) => {
+  const radioGroup = useId();
   const heading = p.isCustom
     ? <Text as="span" className={styles.customPlaceholder}>{p.label}</Text>
     : <Text as="span" className={styles.labelText}>{p.label}</Text>;
@@ -144,6 +146,7 @@ const PossessionLabel = ({ p, checked, selected, uses, onToggle, onRadioSelect, 
               key={subItemKey(p.id, item, idx)}
               item={item}
               possessionId={p.id}
+              radioGroup={radioGroup}
               idx={idx}
               parentChecked={checked}
               selectOne={!!p.selectOneSubItem}
