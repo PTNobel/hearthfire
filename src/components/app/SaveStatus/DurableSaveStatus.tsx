@@ -1,6 +1,6 @@
 import { useId, useState, useSyncExternalStore } from 'react';
 import { Button, Heading, Input, Modal, Text } from '@/components/ui';
-import type { GameSync } from '@/lib/gameSync';
+import { conflictReview, type GameSync } from '@/lib/gameSync';
 import { missingParent, pathLabel, readPath, type PathPart } from '@/lib/syncChanges';
 import { isPlainObject } from '@/lib/typeGuards';
 import { useSaveStatusOptional } from './SaveStatusContext';
@@ -41,11 +41,11 @@ export const DurableSaveStatus = ({ store, online }: { store: GameSync; online: 
                 : fieldStatus?.pendingEdits ? 'Unsaved changes'
                   : queue.lastSavedAt ? 'Saved' : '';
   const remote = store.getRemote();
-  const conflict = queue.conflict;
+  const { conflict, pending: remainingDrafts } = conflictReview(queue);
   const deleted = conflict?.changes.some((change) => missingParent(remote, change.path));
   const resolve = async (keepMine: boolean) => {
     setResolving(true);
-    try { await store.resolveConflict(keepMine, remote); setError(null); }
+    try { await store.resolveConflict(keepMine, remote, conflict); setError(null); }
     catch { setError('Could not update this draft. Please retry.'); }
     finally { setResolving(false); }
   };
@@ -70,7 +70,8 @@ export const DurableSaveStatus = ({ store, online }: { store: GameSync; online: 
       {error && <p role="alert">{error}</p>}
       {conflict && <>
         <Text>Review both versions before applying your changes.</Text>
-        {queue.pending.length > 0 && <Text>Your later edits are also preserved and will be checked next.</Text>}
+        {queue.pending.length > remainingDrafts.length && <Text>Your version includes your latest queued notes. One choice resolves these intermediate saves.</Text>}
+        {remainingDrafts.length > 0 && <Text>Your other edits are also preserved and will be checked next.</Text>}
         {conflict.changes.map((change, index) => <div className={styles.comparison} key={`${pathLabel(change.path)}-${index}`}>
           <Heading as="h3" size="sm">{fieldLabel(remote, change.path)}</Heading>
           <Input multiline readOnly rows={3} label="Shared version" value={displayValue(readPath(remote, change.path))} />

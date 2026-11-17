@@ -13,6 +13,32 @@ export const SYNC_PROTOCOL = 2;
 type RawGame = Record<string, unknown>;
 const SEND_DELAY = 750;
 
+// Old clients could leave a separate conflicted batch for every keystroke.
+// Preview the latest whole-document notes from that writer without changing
+// storage. Only an explicit review decision removes the intermediate drafts.
+export const conflictReview = (queue: DraftQueue): Pick<DraftQueue, 'conflict' | 'pending'> => {
+  const first = queue.conflict;
+  const notesOnly = (edit: DraftEdit) => !!first?.notesKey && edit.notesKey === first.notesKey
+    && !edit.deltas && !edit.order && !edit.restore
+    && edit.changes.every((change) => sameValue(change.path, ['notes', first.notesKey]));
+  if (!first || !notesOnly(first)) return { conflict: first, pending: queue.pending };
+  let conflict = first;
+  const pending: DraftEdit[] = [];
+  let blocked = false;
+  for (const edit of queue.pending) {
+    if (!blocked && notesOnly(edit) && edit.writer === first.writer && edit.generation === first.generation) {
+      const latest = edit.changes[edit.changes.length - 1];
+      conflict = { ...conflict, changes: latest ? [{ ...latest, before: first.changes[0]?.before }] : conflict.changes };
+    } else {
+      pending.push(edit);
+      // Never combine across another writer's notes or a whole-game restore.
+      if (edit.restore || edit.changes.some((change) => change.path[0] === 'notes'
+        && (change.path.length === 1 || change.path[1] === first.notesKey))) blocked = true;
+    }
+  }
+  return { conflict, pending };
+};
+
 export const gameGeneration = (raw: RawGame): string => isPlainObject(raw.sync) && typeof raw.sync.generation === 'string'
   ? raw.sync.generation : `legacy:${String(raw.createdAt ?? 0)}`;
 export const nextSyncMetadata = (raw: RawGame, generation = gameGeneration(raw)) => ({
@@ -394,15 +420,16 @@ export class GameSync {
     } catch { this.publish({ storageError: 'Could not access local drafts. Keep this page open.' }); }
   };
 
-  resolveConflict = async (keepMine: boolean, reviewed: RawGame | null = this.confirmedBase()): Promise<void> => {
+  resolveConflict = async (keepMine: boolean, reviewed: RawGame | null = this.confirmedBase(), reviewedDraft = conflictReview(this.queue).conflict): Promise<void> => {
     const remote = reviewed;
     if (!remote) throw new Error('Load the shared game before resolving this draft.');
     this.queue = await changeQueue(this.gameId, (queue) => {
-      const conflict = queue.conflict;
+      const { conflict, pending } = conflictReview(queue);
       if (!conflict) return queue;
+      if (!sameValue(conflict, reviewedDraft)) throw new Error('Your draft changed. Review the latest version before choosing.');
       const rebased = { ...conflict, id: generateId(), generation: gameGeneration(remote), leaseToken: undefined,
         changes: conflict.changes.map((change) => ({ ...change, before: readPath(remote, change.path) })) };
-      return { ...queue, conflict: undefined, error: undefined, retryable: undefined, pending: keepMine ? [rebased, ...queue.pending] : queue.pending };
+      return { ...queue, conflict: undefined, error: undefined, retryable: undefined, pending: keepMine ? [rebased, ...pending] : pending };
     });
     this.publish(); this.notifyTabs(); this.schedule(0);
   };
