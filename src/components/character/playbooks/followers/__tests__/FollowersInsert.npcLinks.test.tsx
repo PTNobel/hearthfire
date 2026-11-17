@@ -74,7 +74,7 @@ describe('Followers linked to shared NPCs', () => {
 
   it('preserves stats for a missing NPC and allows unlinking', async () => {
     mount([{ ...follower, npcId: 'deleted-npc' }]);
-    expect(screen.getByText(/Linked NPC was removed/)).toBeVisible();
+    expect(screen.getByText(/This NPC was deleted/)).toBeVisible();
     expect(screen.getByLabelText('Follower 1 current HP')).toHaveValue(4);
     expect(screen.getByRole('button', { name: 'Unlink NPC' })).toBeEnabled();
   });

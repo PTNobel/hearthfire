@@ -65,19 +65,21 @@ export const DurableSaveStatus = ({ store, online }: { store: GameSync; online: 
     </span>
     <Modal open={open} onClose={() => setOpen(false)} aria-labelledby={headingId}>
       <Heading as="h2" size="sm" id={headingId}>{label}</Heading>
-      <Text>{state.storageError || queue.error || state.error || (hasDraft ? 'Your changes are preserved here and awaiting server confirmation.'
-        : fieldStatus?.pendingEdits ? 'An open form has changes that have not been submitted.' : 'The latest submitted changes have been confirmed by the server.')}</Text>
+      <Text>{state.storageError || queue.error || state.error || (hasDraft ? 'Your changes are saved in this browser and waiting to sync.'
+        : fieldStatus?.pendingEdits ? 'An open form has unsaved changes.' : 'All submitted changes have synced.')}</Text>
       {error && <p role="alert">{error}</p>}
       {conflict && <>
         <Text>Review both versions before applying your changes.</Text>
-        {queue.pending.length > remainingDrafts.length && <Text>Your version includes your latest queued notes. One choice resolves these intermediate saves.</Text>}
-        {remainingDrafts.length > 0 && <Text>Your other edits are also preserved and will be checked next.</Text>}
+        {queue.pending.length > remainingDrafts.length && <Text>Your version includes your latest notes.</Text>}
+        {remainingDrafts.length > 0 && <Text>Other edits are still waiting to sync.</Text>}
         {conflict.changes.map((change, index) => <div className={styles.comparison} key={`${pathLabel(change.path)}-${index}`}>
           <Heading as="h3" size="sm">{fieldLabel(remote, change.path)}</Heading>
           <Input multiline readOnly rows={3} label="Shared version" value={displayValue(readPath(remote, change.path))} />
           <Input multiline readOnly rows={3} label="Your version" value={displayValue(change.after)} />
         </div>)}
-        {(deleted || conflict.restore || conflict.deltas) && <Text>This draft affects a deleted item or a whole-game operation. Download it for recovery; it cannot be applied automatically.</Text>}
+        {(deleted || conflict.restore || conflict.deltas) && <Text>{deleted
+          ? 'This item was deleted. Download your draft to recover its contents.'
+          : 'This change can’t be applied here. Download your draft to recover it.'}</Text>}
         <div className={styles.actions}>
           <Button variant="secondary" disabled={resolving} onClick={() => { void resolve(false); }}>Keep shared version</Button>
           <Button variant="primary" disabled={resolving || deleted || !!conflict.restore || !!conflict.deltas} onClick={() => { void resolve(true); }}>Apply my changes</Button>

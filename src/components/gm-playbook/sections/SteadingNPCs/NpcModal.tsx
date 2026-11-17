@@ -80,7 +80,7 @@ export const NpcModal = ({ open, onClose, onSave, initial = EMPTY_FORM, title, r
       </div>)}
       {(draft.error || saveError) && <p role="alert">{draft.error || saveError}</p>}
       {draft.error && <Button variant="secondary" onClick={() => draft.change(form)}>Retry saving draft</Button>}
-      <Text size="xs" color="muted">{draft.saving ? 'Saving draft on this device…' : 'Form drafts are kept on this device.'}</Text>
+      <Text size="xs" color="muted">{draft.saving ? 'Saving draft…' : 'Unsaved changes stay in this browser.'}</Text>
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.nameRow}>
           <Input label="Name *" value={form.name} onChange={handleNameChange} autoFocus required />
@@ -88,13 +88,13 @@ export const NpcModal = ({ open, onClose, onSave, initial = EMPTY_FORM, title, r
         </div>
         <Input label="Pronouns" value={form.pronouns} onChange={handlePronounsChange} placeholder="e.g. she/her" />
         <Input label="Occupation" value={form.occupation} onChange={handleOccupationChange} placeholder="e.g. farmer, smith, midwife" />
-        <Input label="Tag" value={form.tag ?? ''} onChange={handleTagChange} placeholder="Individual Tag (separate from traits)" />
+        <Input label="Tag" value={form.tag ?? ''} onChange={handleTagChange} />
         <TagInput
           label="Traits"
           value={form.traits}
           onChange={handleTraitsChange}
           suggestions={NPC_TRAITS}
-          placeholder="Type or pick a trait…"
+          placeholder="Choose or enter a trait"
         />
         <Fieldset legend="Relationships" className={styles.relFieldset}>
           <RelationshipRepeater
@@ -109,7 +109,6 @@ export const NpcModal = ({ open, onClose, onSave, initial = EMPTY_FORM, title, r
           value={form.notes}
           onChange={handleNotesChange}
           rows={3}
-          placeholder="Other notes about this NPC"
         />
         <div className={styles.formActions}>
           <Button variant="ghost" size="md" type="button" onClick={onClose}>Cancel</Button>

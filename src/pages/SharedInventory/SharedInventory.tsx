@@ -43,7 +43,7 @@ const CharacterGearSummary = ({ character }: { character: Character }) => {
   return <>
     <Text size="sm" color="muted">{weights ? `Carried load: ${computeTotalLoad(data, weights.minor, weights.major)}` : 'Calculating carried load…'}</Text>
     {labels.length > 0 ? <ul className={styles.summary}>{labels.map((label, i) => <li key={`${label}-${i}`}><Text as="span" size="sm">{label}</Text></li>)}</ul>
-      : <Text size="sm" color="muted">No carried gear marked yet.</Text>}
+      : <Text size="sm" color="muted">No gear marked as carried.</Text>}
     {!!data?.inventoryUndefined && <Text size="sm">Undefined provisions: {data.inventoryUndefined}</Text>}
     {!!data?.inventorySmallUndefined && <Text size="sm">Undefined small items: {data.inventorySmallUndefined}</Text>}
     {data?.inventoryOtherThings && <Text size="sm">{data.inventoryOtherThings}</Text>}
@@ -60,10 +60,10 @@ const FollowerGear = ({ follower, name, followers, onSave }: { follower: Followe
       { playbookFeatures: { followers } }).catch(() => addToast('Could not save follower gear. Check save status.', 'error'));
   };
   return <section className={styles.gear} aria-labelledby={headingId}>
-    <Heading as="h3" id={headingId} size="sm">{name} — Follower gear</Heading>
+    <Heading as="h3" id={headingId} size="sm">{name}’s gear</Heading>
     <CustomItemsGrid singleItems={gear.slice(0, 3)} doubleItems={gear.slice(3)} doubleOffset={3}
       onCheckedChange={(i, checked) => change(i, { checked })} onTextChange={(i, text) => change(i, { text })}
-      onBlur={flush} ariaPrefix={`${name} gear`} />
+      onBlur={flush} ariaPrefix={`${name}’s gear`} />
   </section>;
 };
 
@@ -81,12 +81,12 @@ const CrewGear = ({ character, prosperity, onSave }: { character: Character; pro
   const changeCustom = (index: number, patch: { checked?: boolean; text?: string }) =>
     save({ crewCustomItems: custom.map((item, i) => i === index ? { ...item, ...patch } : item) });
   return <section className={styles.gear} aria-labelledby={headingId}>
-    <Heading as="h3" id={headingId} size="sm">{character.name || 'Marshal'} — Crew gear</Heading>
+    <Heading as="h3" id={headingId} size="sm">{character.name || 'Marshal'}’s crew gear</Heading>
     {CREW_INVENTORY_ITEMS.map((item) => <Checkbox key={item.id} variant="provision" weight={item.weight ?? 1}
       checked={checked[item.id] ?? false} label={<Text as="span">{item.label}</Text>}
       onChange={(event) => save({ crewInventoryChecked: { ...checked, [item.id]: event.target.checked } })} />)}
     {checked.supplies && supplies.map((uses, index) => <UseDots key={`crew-member-${index}`} total={4 + prosperity} checked={uses}
-      ariaLabel={`Crew member ${index + 1} supplies`}
+      ariaLabel={`Crew member ${index + 1}’s supplies`}
       onChange={(value) => save({ crewSuppliesUses: supplies.map((current, i) => i === index ? value : current) })} />)}
     <CustomItemsGrid singleItems={custom.slice(0, 4)} doubleItems={custom.slice(4)} doubleOffset={4}
       onCheckedChange={(i, value) => changeCustom(i, { checked: value })}
@@ -109,7 +109,7 @@ const CharacterInventory = ({ character, game, onSaveCharacter }: { character: C
   return <section className={styles.card} aria-labelledby={headingId}>
     <Heading as="h2" id={headingId} size="md">{owner}</Heading>
     <CharacterGearSummary character={character} />
-    <Button variant="secondary" aria-expanded={editing} aria-controls={editorId} onClick={() => setEditing((open) => !open)}>Edit {owner} inventory</Button>
+    <Button variant="secondary" aria-expanded={editing} aria-controls={editorId} onClick={() => setEditing((open) => !open)}>Edit {owner}’s inventory</Button>
     <div id={editorId} hidden={!editing}>{editing && <>
       <Inventory data={character.data} prosperity={prosperity} onSave={onSave} showProsperity={false} />
       <SpecialPossessions config={SPECIAL_POSSESSIONS_OPTIONS[character.playbook]} data={character.data} onSave={onSave} level={level}
@@ -128,10 +128,10 @@ export const PartyInventory = ({ game, onSaveCharacter }: { game: GameSession; o
   const [owner, setOwner] = useState('all');
   const characters = owner === 'all' ? game.characters : game.characters.filter((character) => character.id === owner);
   return <div className={styles.root}>
-    <Text color="muted">Plan with the party’s current gear. Changes here update the original inventories, including Followers and Crew.</Text>
-    <div className={styles.filter}><Dropdown id="inventory-owner" label="Show inventories" value={owner} onChange={setOwner}
-      options={[{ value: 'all', label: 'Everyone, Followers and Crew' }, ...game.characters.map((character) => ({ value: character.id, label: character.name || getPlaybook(character.playbook)?.label || 'Character' }))]} /></div>
-    {characters.length === 0 && <Text color="muted">No characters yet. Add a character on the Party Overview to start planning.</Text>}
+    <Text color="muted">Edits here also update character sheets.</Text>
+    <div className={styles.filter}><Dropdown id="inventory-owner" label="Inventory owner" value={owner} onChange={setOwner}
+      options={[{ value: 'all', label: 'Everyone' }, ...game.characters.map((character) => ({ value: character.id, label: character.name || getPlaybook(character.playbook)?.label || 'Character' }))]} /></div>
+    {characters.length === 0 && <Text color="muted">Add a character on Party Overview to see their inventory.</Text>}
     {characters.map((character) => <CharacterInventory key={character.id} character={character} game={game} onSaveCharacter={onSaveCharacter} />)}
   </div>;
 };

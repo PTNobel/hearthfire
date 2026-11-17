@@ -33,33 +33,33 @@ describe('shared inventory', () => {
   it('shows existing character, follower and crew gear with its owner', () => {
     mount();
     expect(within(screen.getByRole('region', { name: 'Aerin' })).getByText('Green cloak')).toBeVisible();
-    const follower = within(screen.getByRole('region', { name: 'Mara — Follower gear' }));
-    expect(follower.getByLabelText('Mara gear 1 name')).toHaveValue('Lantern');
-    expect(follower.getByLabelText('Mara gear 1 equipped')).toBeChecked();
-    const crew = within(screen.getByRole('region', { name: 'Bryn — Crew gear' }));
+    const follower = within(screen.getByRole('region', { name: 'Mara’s gear' }));
+    expect(follower.getByLabelText('Mara’s gear 1 name')).toHaveValue('Lantern');
+    expect(follower.getByLabelText('Mara’s gear 1 equipped')).toBeChecked();
+    const crew = within(screen.getByRole('region', { name: 'Bryn’s crew gear' }));
     expect(crew.getByLabelText('Crew custom gear 1 name')).toHaveValue('Tent');
-    expect(crew.getByRole('group', { name: 'Crew member 1 supplies' })).toBeVisible();
+    expect(crew.getByRole('group', { name: 'Crew member 1’s supplies' })).toBeVisible();
   });
 
   it('filters by character and keeps their companions together', async () => {
     mount();
-    await userEvent.setup().selectOptions(screen.getByLabelText('Show inventories'), 'pc-1');
-    expect(screen.getByRole('region', { name: 'Mara — Follower gear' })).toBeVisible();
-    expect(screen.queryByRole('region', { name: 'Bryn — Crew gear' })).not.toBeInTheDocument();
+    await userEvent.setup().selectOptions(screen.getByLabelText('Inventory owner'), 'pc-1');
+    expect(screen.getByRole('region', { name: 'Mara’s gear' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Bryn’s crew gear' })).not.toBeInTheDocument();
   });
 
   it('edits a character inventory through the original save action', async () => {
     const { save } = mount();
     const user = userEvent.setup();
     const card = within(screen.getByRole('region', { name: 'Aerin' }));
-    await user.click(card.getByRole('button', { name: 'Edit Aerin inventory' }));
+    await user.click(card.getByRole('button', { name: 'Edit Aerin’s inventory' }));
     await user.click(card.getByRole('checkbox', { name: /Rope/ }));
     expect(save).toHaveBeenCalledWith('pc-1', expect.objectContaining({ inventoryChecked: { rope: false } }), { inventoryChecked: { rope: true } });
   });
 
   it('edits follower gear by follower ID and preserves stats and NPC links', () => {
     const { save } = mount();
-    fireEvent.change(screen.getByLabelText('Mara gear 1 name'), { target: { value: 'Oil lantern' } });
+    fireEvent.change(screen.getByLabelText('Mara’s gear 1 name'), { target: { value: 'Oil lantern' } });
     const [id, patch, before] = save.mock.calls[0];
     expect(id).toBe('pc-1');
     expect(patch.playbookFeatures.followers[0]).toMatchObject({ id: 'f1', hp: '4', npcId: 'npc-1', gear: expect.arrayContaining([expect.objectContaining({ text: 'Oil lantern', checked: true })]) });
@@ -69,7 +69,7 @@ describe('shared inventory', () => {
   it('edits crew supplies and custom gear without copying other crew data', async () => {
     const { save } = mount();
     const user = userEvent.setup();
-    await user.click(within(screen.getByRole('group', { name: 'Crew member 1 supplies' })).getByRole('button', { name: 'Use 2' }));
+    await user.click(within(screen.getByRole('group', { name: 'Crew member 1’s supplies' })).getByRole('button', { name: 'Use 2' }));
     expect(save).toHaveBeenCalledWith('pc-2', { playbookFeatures: { crewSuppliesUses: [2, 0, 0, 0, 0, 0] } }, expect.anything());
     fireEvent.change(screen.getByLabelText('Crew custom gear 1 name'), { target: { value: 'Large tent' } });
     expect(save.mock.calls[1][1].playbookFeatures.crewCustomItems[0]).toEqual({ checked: true, text: 'Large tent' });
@@ -82,6 +82,6 @@ describe('shared inventory', () => {
     ] };
     rerender(<MemoryRouter><PartyInventory game={next} onSaveCharacter={save} /></MemoryRouter>);
     expect(within(screen.getByRole('region', { name: 'Aerin' })).getByText('Blue cloak')).toBeVisible();
-    expect(screen.getByRole('region', { name: 'Mara the Scout — Follower gear' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Mara the Scout’s gear' })).toBeVisible();
   });
 });
