@@ -205,7 +205,7 @@ test('followers share an existing NPC profile and removal preserves the NPC', as
   await form.getByRole('button', { name: 'Save NPC', exact: true }).click();
   await expect(steading.getByText('Carries a lantern.', { exact: true })).toBeVisible();
   await steading.getByRole('button', { name: 'Edit NPC A', exact: true }).click();
-  await steading.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Alda');
+  await steading.getByRole('dialog').getByLabel(/^Name/).fill('Alda');
   await steading.getByRole('button', { name: 'Save NPC', exact: true }).click();
   await expect(name).toHaveValue('Alda');
   await expect(sheet.getByLabel('Follower 1 current HP', { exact: true })).toHaveValue(4);
