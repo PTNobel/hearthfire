@@ -57,6 +57,76 @@ const syncWrite = async (accepted: Promise<void>) => {
 const renderGame = () => renderHook(() => useGame('g1'));
 
 describe('useGame mutations', () => {
+  it('still preserves a real competing NPC notes edit for review', async () => {
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0, characters: [], steading: { residents: [{ id: 'npc-1', name: 'Mara', notes: 'Other editor' }] } });
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const before = { name: 'Mara', pronouns: '', occupation: '', tag: '', traits: [], relationships: [], notes: '' };
+    await act(async () => {
+      await result.current.updateCrewNpc('npc-1', before, { ...before, notes: 'My edit' });
+      await getGameSync('g1').send();
+    });
+    expect((await changeQueue('g1')).conflict).toBeDefined();
+    expect(result.current.game?.steading?.residents?.[0].notes).toBe('My edit');
+    const stored = firestoreStore.get(GAME_PATH)?.steading as { residents: { notes: string }[] };
+    expect(stored.residents[0].notes).toBe('Other editor');
+  });
+  it('edits missing optional NPC fields without false conflicts or saving untouched defaults', async () => {
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0, characters: [], steading: { residents: [{ id: 'npc-1', name: 'Mara' }] } });
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const before = { name: 'Mara', pronouns: '', occupation: '', tag: '', traits: [], relationships: [], notes: '' };
+    await act(async () => { await syncWrite(result.current.updateCrewNpc('npc-1', before, { ...before, notes: 'Carries a lantern.', traits: ['brave'] })); });
+    expect(result.current.game?.steading?.residents?.[0]).toMatchObject({ id: 'npc-1', notes: 'Carries a lantern.', traits: ['brave'] });
+    const stored = firestoreStore.get(GAME_PATH)?.steading as { residents: Record<string, unknown>[] };
+    expect(stored.residents[0]).not.toHaveProperty('pronouns');
+    expect(stored.residents[0]).not.toHaveProperty('occupation');
+  });
+  it('creates and links a follower NPC in one durable batch without changing follower stats', async () => {
+    const follower = { id: 'f-1', name: 'Mara', hp: '4', loyalty: 2 };
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0,
+      characters: [char('a', { data: { playbookFeatures: { followers: [follower] } } })],
+      steading: { neighbors: [{ id: 'existing', name: 'Bryn' }] },
+    });
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.createFollowerNpc('a', follower, { id: 'new-npc', name: ' Mara ', notes: 'At the bridge' }); });
+    const queue = await changeQueue('g1');
+    expect(queue.pending).toHaveLength(1);
+    expect(queue.pending[0].changes).toHaveLength(2);
+    await act(async () => { await getGameSync('g1').send(); });
+    expect(result.current.game?.steading?.residents?.[0]).toMatchObject({ id: 'new-npc', name: 'Mara', notes: 'At the bridge' });
+    expect(result.current.game?.steading?.neighbors).toEqual([{ id: 'existing', name: 'Bryn' }]);
+    expect(result.current.game?.characters[0].data?.playbookFeatures?.followers?.[0]).toMatchObject({ ...follower, npcId: 'new-npc' });
+  });
+
+  it('does not create an orphan NPC if its follower was removed before the batch commits', async () => {
+    const follower = { id: 'f-1', name: 'Mara' };
+    const initial = { name: 'Test', createdAt: 0,
+      characters: [char('a', { data: { playbookFeatures: { followers: [follower] } } })],
+    };
+    firestoreStore.set(GAME_PATH, initial);
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.createFollowerNpc('a', follower, { id: 'new-npc', name: 'Mara' }); });
+    await act(async () => {
+      firestoreStore.set(GAME_PATH, { ...initial, characters: [char('a', { data: { playbookFeatures: { followers: [] } } })] });
+      await getGameSync('g1').send();
+    });
+    expect((await changeQueue('g1')).conflict).toBeDefined();
+    expect(firestoreStore.get(GAME_PATH)?.steading).toBeUndefined();
+  });
+
+  it('rejects creating an NPC for a missing or already linked follower', async () => {
+    const follower = { id: 'f-1', npcId: 'existing' };
+    firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 0,
+      characters: [char('a', { data: { playbookFeatures: { followers: [follower] } } })],
+    });
+    const { result } = renderGame();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await expect(result.current.createFollowerNpc('a', follower, { id: 'new-npc', name: 'Mara' })).rejects.toThrow('Unlink');
+    await expect(result.current.createFollowerNpc('a', { id: 'missing' }, { id: 'new-npc', name: 'Mara' })).rejects.toThrow('no longer exists');
+  });
   it('does not rerender game consumers for save-status-only changes', async () => {
     firestoreStore.set(GAME_PATH, { name: 'Test', createdAt: 5, characters: [char('a')] });
     const onRender = vi.fn();

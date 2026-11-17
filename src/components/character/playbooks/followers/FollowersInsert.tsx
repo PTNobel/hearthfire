@@ -1,9 +1,10 @@
-import { useState, useCallback, memo, useId } from "react";
+import { useState, useCallback, useMemo, memo, useId, type ReactNode } from "react";
 import { useLatest } from "@/hooks/useLatest";
 import { useFirestoreSync } from "@/hooks/useFirestoreSync";
 import clsx from "clsx";
 import {
   Button,
+  Dropdown,
   Checkbox,
   Heading,
   Input,
@@ -19,6 +20,11 @@ import { generateId } from "@/lib/id";
 import { useCrewSave } from "../shared/useCrewSave";
 import { StatBox, LoyaltyRow, CustomItemsGrid } from "../shared/CrewWidgets";
 import type { FollowerData, FollowerGearItem, PlaybookSectionProps } from "@/types";
+import type { FollowerNpcs } from './followerNpcs';
+import { NpcModal } from '@/components/gm-playbook/sections/SteadingNPCs/NpcModal';
+import { NpcDetails } from '@/components/gm-playbook/sections/SteadingNPCs/NpcDetails';
+import { buildGroups, buildNameMap, EMPTY_FORM, type NpcFormState } from '@/components/gm-playbook/sections/SteadingNPCs/npcData';
+import { buildIncomingRelationships } from '@/components/gm-playbook/sections/SteadingNPCs/npcRelationships';
 import styles from "./FollowersInsert.module.css";
 
 const GEAR_SINGLE_COUNT = 3;
@@ -43,6 +49,7 @@ const normalizeFollower = (
   id: string,
 ): FollowerData => ({
   id,
+  ...(raw?.npcId ? { npcId: raw.npcId } : {}),
   name: raw?.name ?? "",
   tags: raw?.tags ?? "",
   hp: raw?.hp ?? "",
@@ -101,6 +108,7 @@ interface FollowerCardProps {
   onMoveChange: (fi: number, mi: number, val: string) => void;
   onLoyaltyChange: (fi: number, n: number) => void;
   onRemove: (id: string) => void;
+  npcControls?: ReactNode;
 }
 
 const FollowerCard = memo(
@@ -114,6 +122,7 @@ const FollowerCard = memo(
     onMoveChange,
     onLoyaltyChange,
     onRemove,
+    npcControls,
   }: FollowerCardProps) => {
     const headingId = useId();
     const removeTipId = useId();
@@ -220,6 +229,7 @@ const FollowerCard = memo(
               aria-label={`Follower ${index + 1} name`}
               onChange={handleName}
               onBlur={onBlur}
+              readOnly={!!follower.npcId}
             />
             <Input
               className={styles.tagInput}
@@ -248,6 +258,8 @@ const FollowerCard = memo(
           </Tooltip>
         </div>
 
+        {npcControls}
+
         <Modal
           open={confirmOpen}
           onClose={handleCancelRemove}
@@ -256,7 +268,9 @@ const FollowerCard = memo(
           <Heading as="h2" id={confirmHeadingId}>
             Remove follower?
           </Heading>
-          <Text size="xs" color="muted">{`**${followerLabel}** will be permanently removed. All follower data will be lost and cannot be recovered.`}</Text>
+          <Text size="xs" color="muted">{follower.npcId
+            ? `Remove **${followerLabel}** as a follower? Their NPC record will remain in Steading. Follower stats and gear will be removed.`
+            : `**${followerLabel}** will be permanently removed. All follower data will be lost and cannot be recovered.`}</Text>
           <div className={styles.confirmActions}>
             <Button variant="ghost" size="md" onClick={handleCancelRemove}>
               Cancel
@@ -421,7 +435,7 @@ const FollowerCard = memo(
 
         <div className={styles.fieldRow}>
           <Text as="span" size="xs" color="muted" className={styles.fieldLabel}>
-            Notes
+            {follower.npcId ? 'Follower notes' : 'Notes'}
           </Text>
           <Input
             className={styles.fieldInput}
@@ -438,9 +452,9 @@ const FollowerCard = memo(
   },
 );
 
-type FollowersInsertProps = PlaybookSectionProps;
+type FollowersInsertProps = PlaybookSectionProps & { followerNpcs?: FollowerNpcs };
 
-export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
+export const FollowersInsert = ({ data, onSave, followerNpcs }: FollowersInsertProps) => {
   const { addToast } = useToast();
   const features = resolvePlaybookFeatures(data);
 
@@ -454,6 +468,54 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
 
   const { saveDebounced, saveImmediate, flushDebounce, pendingRef } =
     useCrewSave(data, onSave);
+
+  const [npcModal, setNpcModal] = useState<{ followerId: string; mode: 'create' | 'edit' } | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const game = followerNpcs?.game;
+  const npcs = [...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])];
+  const npcById = new Map(npcs.map((npc) => [npc.id, npc]));
+  const linkedIds = new Set(followers.map((f) => f.npcId).filter(Boolean));
+  const npcGroups = [
+    { label: 'Stonetop Residents', options: (game?.steading?.residents ?? []).filter((npc) => !linkedIds.has(npc.id)).map((npc) => ({ value: npc.id, label: npc.name })) },
+    { label: 'Notable Neighbors', options: (game?.steading?.neighbors ?? []).filter((npc) => !linkedIds.has(npc.id)).map((npc) => ({ value: npc.id, label: npc.name })) },
+  ].filter((group) => group.options.length > 0);
+  const relationshipGroups = useMemo(() => game ? buildGroups(game) : [], [game]);
+  const names = useMemo(() => game ? buildNameMap(game) : new Map<string, string>(), [game]);
+  const incoming = useMemo(() => buildIncomingRelationships(game?.steading?.residents, game?.steading?.neighbors), [game?.steading?.residents, game?.steading?.neighbors]);
+  const modalFollower = followers.find((f) => f.id === npcModal?.followerId);
+  const modalNpc = npcById.get(modalFollower?.npcId ?? '');
+  const modalInitial: NpcFormState = npcModal?.mode === 'edit' && modalNpc ? {
+    name: modalNpc.name, pronouns: modalNpc.pronouns ?? '', occupation: modalNpc.occupation ?? '',
+    tag: modalNpc.tag ?? '', traits: modalNpc.traits ?? [], relationships: modalNpc.relationships ?? [], notes: modalNpc.notes ?? '',
+  } : { ...EMPTY_FORM, name: modalFollower?.name ?? '', notes: modalFollower?.notes ?? '' };
+  const closeNpc = useCallback(() => setNpcModal(null), []);
+  const saveNpc = async (form: NpcFormState, original: NpcFormState, id: string) => {
+    if (!followerNpcs || !npcModal || !modalFollower) throw new Error('This follower no longer exists.');
+    if (npcModal.mode === 'edit') {
+      if (!modalNpc) throw new Error('This NPC no longer exists.');
+      await followerNpcs.update(modalNpc.id, original, form);
+    } else {
+      await saveImmediate({ followers: followersRef.current });
+      await followerNpcs.create(modalFollower, { id, ...form });
+    }
+  };
+
+  const linkNpc = async (followerId: string | null, npcId: string | null) => {
+    const prev = followersRef.current;
+    if (npcId && (!npcById.has(npcId) || prev.some((f) => f.npcId === npcId && f.id !== followerId))) return;
+    const next = followerId ? prev.map((f) => {
+      if (f.id !== followerId) return f;
+      const copy = { ...f };
+      if (npcId) copy.npcId = npcId;
+      else delete copy.npcId;
+      return copy;
+    }) : [...prev, normalizeFollower({ npcId: npcId!, name: npcById.get(npcId!)?.name }, generateId())];
+    setLinkBusy(true);
+    setFollowers(next);
+    try { await saveImmediate({ followers: next }); }
+    catch { setFollowers(prev); addToast('Could not link this follower. Check save status and retry.', 'error'); }
+    finally { setLinkBusy(false); }
+  };
 
   // Mirrors the remote Firestore snapshot into optimistic local state, deferring
   // the echo while a save is in flight. See useFirestoreSync for the guard.
@@ -595,7 +657,8 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
         {followers.map((follower, index) => (
           <FollowerCard
             key={follower.id}
-            follower={follower}
+            follower={follower.npcId && npcById.has(follower.npcId)
+              ? { ...follower, name: npcById.get(follower.npcId)!.name } : follower}
             index={index}
             onFieldChange={handleFieldChange}
             onBlur={flushFollowers}
@@ -604,12 +667,39 @@ export const FollowersInsert = ({ data, onSave }: FollowersInsertProps) => {
             onMoveChange={handleMoveChange}
             onLoyaltyChange={handleLoyaltyChange}
             onRemove={handleRemove}
+            npcControls={followerNpcs && <div className={styles.npcLink}>
+              {follower.npcId ? <>
+                {npcById.has(follower.npcId) ? <>
+                  <Text size="xs" color="muted">NPC details are shared with Steading. Use Edit NPC to update both views.</Text>
+                  <NpcDetails npc={npcById.get(follower.npcId)!}
+                    resolveTarget={(rel) => names.get(rel.targetId) ?? rel.targetId}
+                    incomingRelationships={incoming.get(`${game?.steading?.residents?.some((n) => n.id === follower.npcId) ? 'resident' : 'neighbor'}::${follower.npcId}`) ?? []} />
+                  <Button variant="secondary" size="sm" onClick={() => setNpcModal({ followerId: follower.id, mode: 'edit' })}>Edit NPC</Button>
+                </> : <Text size="xs" color="muted">Linked NPC was removed. Unlink to choose another; follower stats are preserved.</Text>}
+                <Button variant="ghost" size="sm" disabled={linkBusy} onClick={() => { void linkNpc(follower.id, null); }}>Unlink NPC</Button>
+              </> : <>
+                {npcGroups.length > 0 && <Dropdown
+                  id={`follower-npc-${follower.id}`} aria-label={`Link follower ${index + 1} to existing NPC`}
+                  value="" groups={npcGroups} placeholder="Link existing NPC…" disabled={linkBusy}
+                  onChange={(id) => { void linkNpc(follower.id, id); }} />}
+                <Button variant="secondary" size="sm" onClick={() => setNpcModal({ followerId: follower.id, mode: 'create' })}>Create NPC</Button>
+              </>}
+            </div>}
           />
         ))}
+        {followerNpcs && npcGroups.length > 0 && <Dropdown
+          id="add-npc-follower" aria-label="Add existing NPC as follower" value="" groups={npcGroups}
+          placeholder="Choose an NPC to become a follower…" disabled={linkBusy}
+          onChange={(id) => { void linkNpc(null, id); }} />}
         <Button variant="secondary" onClick={handleAdd}>
           Add Follower
         </Button>
       </PlaybookSection>
+      {npcModal && modalFollower && followerNpcs && <NpcModal
+        key={`${npcModal.mode}-${modalFollower.id}-${modalNpc?.id ?? 'new'}`} open onClose={closeNpc} onSave={saveNpc}
+        initial={modalInitial} draftKey={`follower-npc-${followerNpcs.characterId}-${modalFollower.id}-${modalNpc?.id ?? 'new'}`}
+        title={npcModal.mode === 'create' ? 'Create follower NPC' : 'Edit linked follower NPC'}
+        relationshipGroups={relationshipGroups.map((group) => ({ ...group, options: group.options.filter((opt) => !modalNpc || !opt.value.endsWith(`::${modalNpc.id}`)) })).filter((group) => group.options.length > 0)} />}
     </div>
   );
 };

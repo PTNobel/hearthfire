@@ -183,6 +183,40 @@ test('the stored light theme applies on a direct Home reload', async ({ page }) 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
+test('followers share an existing NPC profile and removal preserves the NPC', async ({ context }) => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const ref = doc(ctx.firestore(), 'games', id);
+    const game = (await getDoc(ref)).data()!;
+    await setDoc(ref, { ...game, characters: [{ ...game.characters[0], data: { inserts: ['Followers'] } }] });
+  });
+  await context.addInitScript((gameId) => localStorage.setItem('hearthfire:session-game-id', gameId), id);
+  const sheet = await context.newPage();
+  const steading = await context.newPage();
+  await sheet.goto('/game/heavy#Followers');
+  await steading.goto('/game/steading#npcs');
+  await sheet.getByRole('combobox', { name: 'Add existing NPC as follower', exact: true }).selectOption('npc-a');
+  const name = sheet.getByLabel('Follower 1 name', { exact: true });
+  await expect(name).toHaveValue('NPC A');
+  await sheet.getByLabel('Follower 1 current HP', { exact: true }).fill('4');
+  await sheet.getByLabel('Follower 1 current HP', { exact: true }).blur();
+  await sheet.getByRole('button', { name: 'Edit NPC', exact: true }).click();
+  const form = sheet.getByRole('dialog');
+  await form.getByLabel('Notes', { exact: true }).fill('Carries a lantern.');
+  await form.getByRole('button', { name: 'Save NPC', exact: true }).click();
+  await expect(steading.getByText('Carries a lantern.', { exact: true })).toBeVisible();
+  await steading.getByRole('button', { name: 'Edit NPC A', exact: true }).click();
+  await steading.getByRole('dialog').getByLabel(/^Name/).fill('Alda');
+  await steading.getByRole('button', { name: 'Save NPC', exact: true }).click();
+  await expect(name).toHaveValue('Alda');
+  await expect(sheet.getByLabel('Follower 1 current HP', { exact: true })).toHaveValue('4');
+  await sheet.getByRole('button', { name: 'Remove Alda', exact: true }).click();
+  await sheet.getByRole('dialog').getByRole('button', { name: 'Remove follower', exact: true }).click();
+  const stored = () => getDoc(doc(env.unauthenticatedContext().firestore(), 'games', id));
+  await expect.poll(async () => (await stored()).data()?.characters[0].data.playbookFeatures.followers).toEqual([]);
+  expect((await stored()).data()?.steading.residents).toHaveLength(2);
+  await expect(steading.getByRole('button', { name: 'Edit Alda', exact: true })).toBeVisible();
+});
+
 test('notes can be edited again after the previous hold releases', async ({ page }) => {
   await page.addInitScript((gameId) => localStorage.setItem('hearthfire:session-game-id', gameId), id);
   await page.goto('/game/heavy#inventory');
