@@ -208,7 +208,7 @@ test('followers share an existing NPC profile and removal preserves the NPC', as
   await steading.getByRole('dialog').getByLabel(/^Name/).fill('Alda');
   await steading.getByRole('button', { name: 'Save NPC', exact: true }).click();
   await expect(name).toHaveValue('Alda');
-  await expect(sheet.getByLabel('Follower 1 current HP', { exact: true })).toHaveValue(4);
+  await expect(sheet.getByLabel('Follower 1 current HP', { exact: true })).toHaveValue('4');
   await sheet.getByRole('button', { name: 'Remove Alda', exact: true }).click();
   await sheet.getByRole('dialog').getByRole('button', { name: 'Remove follower', exact: true }).click();
   const stored = () => getDoc(doc(env.unauthenticatedContext().firestore(), 'games', id));
