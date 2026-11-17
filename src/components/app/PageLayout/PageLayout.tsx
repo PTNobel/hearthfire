@@ -53,7 +53,7 @@ type FullProps = {
   // Forwarded to PageHeader's game-ID row — see its `actions` prop.
   actions?: React.ReactNode;
   // Mounts the slide-out dice roller; its rolls land in the game's shared roll log via `onRoll`.
-  diceRoller?: { rollerId: string; rollerName: string; onRoll: (roll: LoggedRoll) => Promise<void> };
+  diceRoller?: { rollerId: string; rollerName: string; onRoll: (roll: LoggedRoll) => Promise<void>; rolls?: LoggedRoll[] };
 } & (
   | { onSaveTitle: (value: string) => Promise<void>; titleLabel: string }
   | { onSaveTitle?: never; titleLabel?: never }

@@ -417,7 +417,7 @@ const CharacterSheet = ({
       gameId={id}
       nav={nav}
       onSaveTitle={handleSaveCharacterName}
-      diceRoller={{ rollerId: character.id, rollerName: characterName || '', onRoll: logRoll }}
+      diceRoller={{ rollerId: character.id, rollerName: characterName || '', onRoll: logRoll, rolls: game.diceRolls }}
     >
       <PageMeta
         title={pageTitle}

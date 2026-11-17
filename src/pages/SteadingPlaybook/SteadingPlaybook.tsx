@@ -222,7 +222,7 @@ const SteadingContent = ({ g, id, updateSteading, logRoll, notesActions }: Stead
   const nav = buildGameNav(g, '/game/steading');
 
   return (
-    <PageLayout title="Steading Playbook" gameId={id} nav={nav} diceRoller={{ rollerId: 'steading', rollerName: 'Steading', onRoll: logRoll }}>
+    <PageLayout title="Steading Playbook" gameId={id} nav={nav} diceRoller={{ rollerId: 'steading', rollerName: 'Steading', onRoll: logRoll, rolls: g.diceRolls }}>
       <PageMeta
         title={`Steading Playbook — ${gameName} — Hearthfire`}
         description={`Stonetop steading playbook for ${gameName}. Track stats, improvements, assets, and NPCs.`}
