@@ -200,16 +200,16 @@ test('shared inventory edits synchronize with character, follower and crew sheet
   await shared.goto('/game/inventory');
   await sheet.goto('/game/heavy#inventory');
   const character = shared.getByRole('region', { name: 'Character A', exact: true });
-  await character.getByRole('button', { name: 'Edit Character A inventory', exact: true }).click();
+  await character.getByRole('button', { name: 'Edit Character A’s inventory', exact: true }).click();
   await character.getByRole('checkbox', { name: /Rope/ }).press('Space');
   await expect(sheet.getByRole('checkbox', { name: /Rope/ })).not.toBeChecked();
   await sheet.getByLabel('Other things', { exact: true }).fill('Pack animal at the bridge');
   await sheet.getByLabel('Other things', { exact: true }).blur();
   await expect(character.getByRole('paragraph').filter({ hasText: /^Pack animal at the bridge$/ })).toBeVisible();
-  await shared.getByLabel('Mara gear 1 name', { exact: true }).fill('Oil lantern');
-  await shared.getByLabel('Mara gear 1 name', { exact: true }).blur();
+  await shared.getByLabel('Mara’s gear 1 name', { exact: true }).fill('Oil lantern');
+  await shared.getByLabel('Mara’s gear 1 name', { exact: true }).blur();
   await sheet.goto('/game/heavy#Followers');
-  await expect(sheet.getByLabel('Follower 1 1 name', { exact: true })).toHaveValue('Oil lantern');
+  await expect(sheet.getByLabel('Follower 1 gear 1 name', { exact: true })).toHaveValue('Oil lantern');
   await shared.getByLabel('Crew custom gear 1 name', { exact: true }).fill('Large tent');
   await shared.getByLabel('Crew custom gear 1 name', { exact: true }).blur();
   await sheet.goto('/game/marshal#crew');
@@ -224,7 +224,7 @@ test('shared inventory edits synchronize with character, follower and crew sheet
   expect(data.characters[1].data.playbookFeatures.crewHp).toBe('6');
   expect(data.sharedInventory).toBeUndefined();
   await shared.reload();
-  await expect(shared.getByLabel('Mara gear 1 name', { exact: true })).toHaveValue('Oil lantern');
+  await expect(shared.getByLabel('Mara’s gear 1 name', { exact: true })).toHaveValue('Oil lantern');
   await expect(shared.getByLabel('Crew custom gear 1 name', { exact: true })).toHaveValue('Blue tent');
 });
 

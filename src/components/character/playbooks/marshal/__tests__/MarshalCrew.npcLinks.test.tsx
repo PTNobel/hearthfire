@@ -60,7 +60,7 @@ describe('Marshal crew and shared Steading NPCs', () => {
       expect(card.getByText(text)).toBeVisible();
     }
     expect(card.queryByRole('textbox')).not.toBeInTheDocument();
-    await user.click(card.getByText('Original Crew entry'));
+    await user.click(card.getByText('Previous crew details'));
     expect(card.getByText('Tag: brave')).toBeVisible();
     expect(card.getByText('Traits: a scout')).toBeVisible();
 
@@ -124,7 +124,7 @@ describe('Marshal crew and shared Steading NPCs', () => {
     const user = userEvent.setup();
     const { onLinkNpc } = mount(true, { ...game, steading: {} });
     const card = within(screen.getByRole('group', { name: 'Crew individual 1' }));
-    expect(card.getByText('Linked NPC was removed. Unlink to choose another.')).toBeVisible();
+    expect(card.getByText('This NPC was deleted. Unlink to choose another.')).toBeVisible();
     expect(card.queryByRole('textbox')).not.toBeInTheDocument();
     expect(card.queryByRole('button', { name: /Edit Steading NPC/ })).not.toBeInTheDocument();
     await user.click(card.getByRole('button', { name: 'Unlink individual 1 from Steading NPC' }));
@@ -157,7 +157,7 @@ describe('existing Crew conversions', () => {
     expect(card.queryByText('Tag: brave')).not.toBeVisible();
     expect(onSave).not.toHaveBeenCalled();
     expect(onEditNpc).not.toHaveBeenCalled();
-    await user.click(card.getByText('Original Crew entry'));
+    await user.click(card.getByText('Previous crew details'));
     expect(card.getByText('Tag: brave')).toBeVisible();
     await user.click(card.getByRole('button', { name: 'Edit Steading NPC for individual 1' }));
     const dialog = within(screen.getByRole('dialog'));

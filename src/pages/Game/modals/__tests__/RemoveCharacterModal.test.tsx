@@ -25,7 +25,7 @@ describe('RemoveCharacterModal', () => {
     expect(
       screen.getByText('Brgenwose (The Heavy Playbook)', { selector: 'strong' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/will be permanently removed/i)).toBeInTheDocument();
+    expect(screen.getByText(/sheet and saved data will be deleted/i)).toBeInTheDocument();
   });
 
   it('calls onConfirm exactly once when the GM confirms removal', async () => {

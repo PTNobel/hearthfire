@@ -202,8 +202,8 @@ const IndividualSlot = memo(
         {linked ? <>
           {npcDetails}
           {(name || tag || traits) && <details className={styles.originalIndividual}>
-            <summary>Original Crew entry</summary>
-            <Text size="xs" color="muted">Kept for reference; used again if unlinked. To carry an original Tag into the shared profile, use Edit NPC and enter it in Tag.</Text>
+            <summary>Previous crew details</summary>
+            <Text size="xs" color="muted">These details return if you unlink this NPC.</Text>
             {name && <Text size="xs">Name: {name}</Text>}
             {tag && <Text size="xs">Tag: {tag}</Text>}
             {traits && <Text size="xs">Traits: {traits}</Text>}
@@ -889,11 +889,7 @@ export const MarshalCrew = ({ data, prosperity, onSave, game, characterId, onLin
                   <div className={styles.npcLink}>
                     {npcId ? (
                       <>
-                        <Text size="xs" color="muted">
-                          {npc
-                            ? 'Shared with Steading. Edit NPC to update both views.'
-                            : 'Linked NPC was removed. Unlink to choose another.'}
-                        </Text>
+                        {!npc && <Text size="xs" color="muted">This NPC was deleted. Unlink to choose another.</Text>}
                         <div className={styles.npcLinkActions}>
                           {npc && (
                             <Button variant="secondary" size="sm" disabled={linkBusy !== null}

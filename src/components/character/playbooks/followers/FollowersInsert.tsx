@@ -269,8 +269,8 @@ const FollowerCard = memo(
             Remove follower?
           </Heading>
           <Text size="xs" color="muted">{follower.npcId
-            ? `Remove **${followerLabel}** as a follower? Their NPC record will remain in Steading. Follower stats and gear will be removed.`
-            : `**${followerLabel}** will be permanently removed. All follower data will be lost and cannot be recovered.`}</Text>
+            ? `**${followerLabel}**’s follower stats and gear will be deleted. Their NPC will remain in Steading.`
+            : `**${followerLabel}** and their follower data will be deleted.`}</Text>
           <div className={styles.confirmActions}>
             <Button variant="ghost" size="md" onClick={handleCancelRemove}>
               Cancel
@@ -429,7 +429,7 @@ const FollowerCard = memo(
             onCheckedChange={handleGearChecked}
             onTextChange={handleGearText}
             onBlur={onBlur}
-            ariaPrefix={`Follower ${index + 1}`}
+            ariaPrefix={`Follower ${index + 1} gear`}
           />
         </div>
 
@@ -670,12 +670,11 @@ export const FollowersInsert = ({ data, onSave, followerNpcs }: FollowersInsertP
             npcControls={followerNpcs && <div className={styles.npcLink}>
               {follower.npcId ? <>
                 {npcById.has(follower.npcId) ? <>
-                  <Text size="xs" color="muted">NPC details are shared with Steading. Use Edit NPC to update both views.</Text>
                   <NpcDetails npc={npcById.get(follower.npcId)!}
                     resolveTarget={(rel) => names.get(rel.targetId) ?? rel.targetId}
                     incomingRelationships={incoming.get(`${game?.steading?.residents?.some((n) => n.id === follower.npcId) ? 'resident' : 'neighbor'}::${follower.npcId}`) ?? []} />
                   <Button variant="secondary" size="sm" onClick={() => setNpcModal({ followerId: follower.id, mode: 'edit' })}>Edit NPC</Button>
-                </> : <Text size="xs" color="muted">Linked NPC was removed. Unlink to choose another; follower stats are preserved.</Text>}
+                </> : <Text size="xs" color="muted">This NPC was deleted. Unlink to choose another.</Text>}
                 <Button variant="ghost" size="sm" disabled={linkBusy} onClick={() => { void linkNpc(follower.id, null); }}>Unlink NPC</Button>
               </> : <>
                 {npcGroups.length > 0 && <Dropdown
@@ -689,16 +688,16 @@ export const FollowersInsert = ({ data, onSave, followerNpcs }: FollowersInsertP
         ))}
         {followerNpcs && npcGroups.length > 0 && <Dropdown
           id="add-npc-follower" aria-label="Add existing NPC as follower" value="" groups={npcGroups}
-          placeholder="Choose an NPC to become a follower…" disabled={linkBusy}
+          placeholder="Choose an NPC…" disabled={linkBusy}
           onChange={(id) => { void linkNpc(null, id); }} />}
         <Button variant="secondary" onClick={handleAdd}>
-          Add Follower
+          Add follower
         </Button>
       </PlaybookSection>
       {npcModal && modalFollower && followerNpcs && <NpcModal
         key={`${npcModal.mode}-${modalFollower.id}-${modalNpc?.id ?? 'new'}`} open onClose={closeNpc} onSave={saveNpc}
         initial={modalInitial} draftKey={`follower-npc-${followerNpcs.characterId}-${modalFollower.id}-${modalNpc?.id ?? 'new'}`}
-        title={npcModal.mode === 'create' ? 'Create follower NPC' : 'Edit linked follower NPC'}
+        title={npcModal.mode === 'create' ? 'Create NPC' : 'Edit NPC'}
         relationshipGroups={relationshipGroups.map((group) => ({ ...group, options: group.options.filter((opt) => !modalNpc || !opt.value.endsWith(`::${modalNpc.id}`)) })).filter((group) => group.options.length > 0)} />}
     </div>
   );
