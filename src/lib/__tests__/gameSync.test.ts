@@ -30,6 +30,36 @@ const send = async (store: GameSync) => {
 };
 
 describe('durable synchronization', () => {
+  it('finishes a queued release before resuming typing with a new hold', async () => {
+    const store = await client();
+    await store.claimNotes('gm');
+    const oldToken = store.notesToken('gm');
+    await store.enqueue(base, diffValues('Original', 'Paused', ['notes', 'gm']), 'Notes', {
+      notesKey: 'gm', leaseToken: oldToken, releaseLock: true,
+    });
+    store.forgetNotesToken('gm', oldToken);
+    // useNotesLock preserves the first resumed keystroke before claiming.
+    await store.enqueue(store.getSnapshot().raw!, diffValues('Paused', 'Resuming', ['notes', 'gm']), 'Notes', { notesKey: 'gm' });
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    expect(await store.claimNotes('gm')).toBe(true);
+    await store.enqueue(store.getSnapshot().raw!, diffValues('Resuming', 'Resumed', ['notes', 'gm']), 'Notes', {
+      notesKey: 'gm', leaseToken: store.notesToken('gm'),
+    });
+    await store.send(); await store.send();
+    expect((await changeQueue(id)).conflict).toBeUndefined();
+    expect(firestoreStore.get('games/' + id)?.notes).toEqual({ gm: 'Resumed' });
+  });
+  it('chains typing across lock acquisition before React renders the first draft', async () => {
+    const store = await client();
+    await store.enqueue(base, diffValues('Original', 'First', ['notes', 'gm']), 'Notes', { notesKey: 'gm' });
+    await store.claimNotes('gm');
+    await store.enqueue(base, diffValues('Original', 'Latest', ['notes', 'gm']), 'Notes', {
+      notesKey: 'gm', leaseToken: store.notesToken('gm'),
+    });
+    await send(store); await store.send();
+    expect((await changeQueue(id)).conflict).toBeUndefined();
+    expect(firestoreStore.get('games/' + id)?.notes).toEqual({ gm: 'Latest' });
+  });
   it('recovers the latest of several offline drafts after the store restarts', async () => {
     const first = await client();
     await first.enqueue(base, diffValues(base.notes.gm, 'First', ['notes', 'gm']), 'Notes');
