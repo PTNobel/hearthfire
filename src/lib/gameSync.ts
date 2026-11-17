@@ -239,14 +239,18 @@ export class GameSync {
         }
         const pending = [...queue.pending];
         const last = pending[pending.length - 1];
+        // Lock acquisition splits notes into separate batches. They still
+        // belong to the same writer, even before React renders its last edit.
+        if (last && last.writer === this.writer && last.generation === edit.generation) {
+          edit.changes = edit.changes.map((change) => {
+            const previous = [...last.changes].reverse().find((c) => sameValue(c.path, change.path));
+            return previous && sameValue(previous.before, change.before) ? { ...change, before: previous.after } : change;
+          });
+        }
         if (last && last.writer === this.writer && last.generation === edit.generation
           && last.notesKey === edit.notesKey && last.leaseToken === edit.leaseToken
           && !last.deltas && !edit.deltas && !last.order && !edit.order && !last.restore && !edit.restore) {
-          const normalized = edit.changes.map((change) => {
-            const previous = last.changes.find((c) => sameValue(c.path, change.path));
-            return previous && sameValue(previous.before, change.before) ? { ...change, before: previous.after } : change;
-          });
-          pending[pending.length - 1] = { ...last, changes: composeChanges(last.changes, normalized), releaseLock: last.releaseLock || edit.releaseLock };
+          pending[pending.length - 1] = { ...last, changes: composeChanges(last.changes, edit.changes), releaseLock: last.releaseLock || edit.releaseLock };
         } else pending.push(edit);
         return { ...queue, pending, cachedGame: confirmed && (!queue.cachedGame || nextSyncMetadata(confirmed).revision > nextSyncMetadata(queue.cachedGame).revision) ? confirmed : queue.cachedGame };
       }, initial));
@@ -406,6 +410,19 @@ export class GameSync {
   claimNotes = async (key: string): Promise<boolean> => {
     const token = generateId();
     this.claims.set(key, token);
+    // A pause queues a release; the next keystroke may arrive before it is
+    // sent. Finish that hold's immutable batches before replacing its token,
+    // otherwise our own release is rejected as an obsolete editor's write.
+    await this.ready;
+    await this.persistVolatile();
+    for (;;) {
+      this.queue = await changeQueue(this.gameId);
+      const outstanding = [this.queue.sending, ...this.queue.pending].some((edit) =>
+        edit?.writer === this.writer && edit.notesKey === key && edit.leaseToken);
+      if (!outstanding) break;
+      if (this.queue.conflict || this.queue.error || this.state.storageError || !navigator.onLine || this.claims.get(key) !== token) return false;
+      await this.send();
+    }
     let claimed = false;
     const ref = doc(db, GAMES_COLLECTION, this.gameId);
     await runGameTransaction(ref, async (tx, observed) => {
