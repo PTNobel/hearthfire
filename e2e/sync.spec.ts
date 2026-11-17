@@ -183,6 +183,51 @@ test('the stored light theme applies on a direct Home reload', async ({ page }) 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
+test('shared inventory edits synchronize with character, follower and crew sheets', async ({ context }) => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const ref = doc(ctx.firestore(), 'games', id);
+    const game = (await getDoc(ref)).data()!;
+    await setDoc(ref, { ...game, characters: [
+      { ...game.characters[0], data: { inserts: ['Followers'], inventoryChecked: { rope: true },
+        playbookFeatures: { followers: [{ id: 'f-1', name: 'Mara', hp: '4', gear: [{ checked: true, text: 'Lantern', weight: 1 }] }] } } },
+      { id: 'pc-b', name: 'The Marshal', playbook: 'marshal', level: 1,
+        data: { playbookFeatures: { crewCustomItems: [{ checked: true, text: 'Tent' }], crewHp: '6' } } },
+    ] });
+  });
+  await context.addInitScript((gameId) => localStorage.setItem('hearthfire:session-game-id', gameId), id);
+  const shared = await context.newPage();
+  const sheet = await context.newPage();
+  await shared.goto('/game/inventory');
+  await sheet.goto('/game/heavy#inventory');
+  const character = shared.getByRole('region', { name: 'Character A', exact: true });
+  await character.getByRole('button', { name: 'Edit Character A inventory', exact: true }).click();
+  await character.getByRole('checkbox', { name: /Rope/ }).press('Space');
+  await expect(sheet.getByRole('checkbox', { name: /Rope/ })).not.toBeChecked();
+  await sheet.getByLabel('Other things', { exact: true }).fill('Pack animal at the bridge');
+  await sheet.getByLabel('Other things', { exact: true }).blur();
+  await expect(character.getByRole('paragraph').filter({ hasText: /^Pack animal at the bridge$/ })).toBeVisible();
+  await shared.getByLabel('Mara gear 1 name', { exact: true }).fill('Oil lantern');
+  await shared.getByLabel('Mara gear 1 name', { exact: true }).blur();
+  await sheet.goto('/game/heavy#Followers');
+  await expect(sheet.getByLabel('Follower 1 1 name', { exact: true })).toHaveValue('Oil lantern');
+  await shared.getByLabel('Crew custom gear 1 name', { exact: true }).fill('Large tent');
+  await shared.getByLabel('Crew custom gear 1 name', { exact: true }).blur();
+  await sheet.goto('/game/marshal#crew');
+  await expect(sheet.getByLabel('Custom inventory item 1 name', { exact: true })).toHaveValue('Large tent');
+  await sheet.getByLabel('Custom inventory item 1 name', { exact: true }).fill('Blue tent');
+  await sheet.getByLabel('Custom inventory item 1 name', { exact: true }).blur();
+  await expect(shared.getByLabel('Crew custom gear 1 name', { exact: true })).toHaveValue('Blue tent');
+  const stored = () => getDoc(doc(env.unauthenticatedContext().firestore(), 'games', id));
+  await expect.poll(async () => (await stored()).data()?.characters[1].data.playbookFeatures.crewCustomItems[0].text).toBe('Blue tent');
+  const data = (await stored()).data()!;
+  expect(data.characters[0].data.playbookFeatures.followers[0].hp).toBe('4');
+  expect(data.characters[1].data.playbookFeatures.crewHp).toBe('6');
+  expect(data.sharedInventory).toBeUndefined();
+  await shared.reload();
+  await expect(shared.getByLabel('Mara gear 1 name', { exact: true })).toHaveValue('Oil lantern');
+  await expect(shared.getByLabel('Crew custom gear 1 name', { exact: true })).toHaveValue('Blue tent');
+});
+
 test('followers share an existing NPC profile and removal preserves the NPC', async ({ context }) => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const ref = doc(ctx.firestore(), 'games', id);

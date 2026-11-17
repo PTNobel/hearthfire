@@ -34,6 +34,7 @@ const CharacterPlaybook = lazy(() =>
 const NotFound = lazy(() =>
   import("@/pages/NotFound/NotFound").then((m) => ({ default: m.NotFound })),
 );
+const SharedInventory = lazy(() => import('@/pages/SharedInventory/SharedInventory').then((m) => ({ default: m.SharedInventory })));
 
 /*
  * App — the root of the entire application.
@@ -48,6 +49,7 @@ const NotFound = lazy(() =>
  *   /game                    → Game (party overview, secret in browser storage)
  *   /game/gm                 → GM Playbook
  *   /game/steading           → Steading Playbook
+ *   /game/inventory          → Shared character, follower and crew inventories
  *   /game/:playbook          → Character Playbook
  *   *                        → NotFound (404)
  *
@@ -76,6 +78,7 @@ export const App = () => {
             <Route path="/game" element={<Game />} />
             <Route path="/game/gm" element={<GmPlaybook />} />
             <Route path="/game/steading" element={<SteadingPlaybook />} />
+            <Route path="/game/inventory" element={<SharedInventory />} />
             <Route path="/game/:playbook" element={<CharacterPlaybook />} />
           </Route>
           <Route path="*" element={<NotFound />} />
