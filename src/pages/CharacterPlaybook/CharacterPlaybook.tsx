@@ -59,6 +59,7 @@ const SeekerCollection = lazy(() => import('@/components/character/playbooks/see
 const WouldBeHeroFearAnger = lazy(() => import('@/components/character/playbooks/would-be-hero').then((m) => ({ default: m.WouldBeHeroFearAnger })));
 import type { Character, CharacterData, GameSession, LoggedRoll, NotesLock, PlaybookType, PlaybookFeatures, SteadingNPC } from '@/types';
 import type { RollReport } from '@/components/character/Move/RollAffordance';
+import type { FollowerNpcs } from '@/components/character/playbooks/followers/followerNpcs';
 import { CharacterRollContext } from '@/components/character/Move/CharacterRollContext';
 import styles from './CharacterPlaybook.module.css';
 
@@ -171,6 +172,7 @@ interface SheetProps {
   adjustCharacterStats: (characterId: string, deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
   setCrewNpcLink: ReturnType<typeof useGame>['setCrewNpcLink'];
   createCrewNpc: ReturnType<typeof useGame>['createCrewNpc'];
+  createFollowerNpc: ReturnType<typeof useGame>['createFollowerNpc'];
   updateCrewNpc: ReturnType<typeof useGame>['updateCrewNpc'];
   logRoll: (roll: LoggedRoll) => Promise<void>;
   notesHtml: string | undefined;
@@ -222,7 +224,7 @@ const getPlaybookTabs = (playbook: PlaybookType, data: CharacterData | undefined
 const CharacterSheet = ({
   game, character, playbookOption, id, gameName, prosperity, nav,
   updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink,
-  createCrewNpc, updateCrewNpc, logRoll, notesHtml, notesLock, notesActions,
+  createCrewNpc, createFollowerNpc, updateCrewNpc, logRoll, notesHtml, notesLock, notesActions,
 }: SheetProps) => {
   const headerRef = useRef<HTMLDivElement>(null);
 
@@ -372,6 +374,12 @@ const CharacterSheet = ({
     useCallback((i: number) => setActiveIndexRef.current(i), []),
   );
 
+  const followerNpcs = useMemo<FollowerNpcs>(() => ({
+    game, characterId: character.id,
+    create: (follower, npc) => createFollowerNpc(character.id, follower, npc),
+    update: updateCrewNpc,
+  }), [game, character.id, createFollowerNpc, updateCrewNpc]);
+
   const tabs = useMemo(() => [
     ...nonInsertTabs,
     ...(characterData?.inserts ?? []).map((insertId) => {
@@ -382,12 +390,12 @@ const CharacterSheet = ({
       return {
         id: insertId,
         label,
-        content: insert ? lazyTab(<insert.Component data={characterData} onSave={handleSaveCharacterData} />) : null,
+        content: insert ? lazyTab(<insert.Component data={characterData} onSave={handleSaveCharacterData} followerNpcs={followerNpcs} />) : null,
         onRemove: insert ? removeInsertHandlers[insert.id] : undefined,
         removeTooltip: `Remove ${label}`,
       };
     }),
-  ], [nonInsertTabs, characterData, handleSaveCharacterData, removeInsertHandlers]);
+  ], [nonInsertTabs, characterData, handleSaveCharacterData, removeInsertHandlers, followerNpcs]);
 
   const { activeIndex, setActiveIndex: setActiveIndexFn, handleActiveChange: hashHandleActiveChange } = useHashTabs(tabs);
   // Mirror the latest tab setter into a ref (written post-commit, not during
@@ -449,7 +457,7 @@ const CharacterSheet = ({
   );
 };
 
-const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink, createCrewNpc, updateCrewNpc, logRoll, notesActions }: {
+const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink, createCrewNpc, createFollowerNpc, updateCrewNpc, logRoll, notesActions }: {
   g: GameSession;
   id: string;
   playbook: PlaybookType;
@@ -458,6 +466,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
   adjustCharacterStats: (characterId: string, deltas: Partial<Record<'statArmor' | 'statHp', number>>) => Promise<void>;
   setCrewNpcLink: ReturnType<typeof useGame>['setCrewNpcLink'];
   createCrewNpc: ReturnType<typeof useGame>['createCrewNpc'];
+  createFollowerNpc: ReturnType<typeof useGame>['createFollowerNpc'];
   updateCrewNpc: ReturnType<typeof useGame>['updateCrewNpc'];
   logRoll: (roll: LoggedRoll) => Promise<void>;
   notesActions: NotesActions;
@@ -510,6 +519,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
       adjustCharacterStats={adjustCharacterStats}
       setCrewNpcLink={setCrewNpcLink}
       createCrewNpc={createCrewNpc}
+      createFollowerNpc={createFollowerNpc}
       updateCrewNpc={updateCrewNpc}
       logRoll={logRoll}
       notesHtml={g.notes?.[character.id]}
@@ -522,7 +532,7 @@ const CharacterPlaybookContent = ({ g, id, playbook, updateCharacterName, update
 export const CharacterPlaybook = () => {
   const { playbook = '' } = useParams<{ playbook: string }>();
   const id = requireSessionGameId();
-  const { game, loading, error, updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink, createCrewNpc, updateCrewNpc, logRoll, updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock } = useGame(id);
+  const { game, loading, error, updateCharacterName, updateCharacterData, adjustCharacterStats, setCrewNpcLink, createCrewNpc, createFollowerNpc, updateCrewNpc, logRoll, updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock } = useGame(id);
   const notesActions = useNotesActions({ updateNotes, claimNotesLock, refreshNotesLock, releaseNotesLock });
 
   return (
@@ -537,6 +547,7 @@ export const CharacterPlaybook = () => {
           adjustCharacterStats={adjustCharacterStats}
           setCrewNpcLink={setCrewNpcLink}
           createCrewNpc={createCrewNpc}
+          createFollowerNpc={createFollowerNpc}
           updateCrewNpc={updateCrewNpc}
           logRoll={logRoll}
           notesActions={notesActions}

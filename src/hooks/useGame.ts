@@ -4,7 +4,7 @@ import { diffValues, readPath, sameValue, type PathPart } from '@/lib/syncChange
 import { mergeById, STEADING_ID_ARRAY_FIELDS, stripUndefined } from '@/lib/gameMutations';
 import { isPlainObject } from '@/lib/typeGuards';
 import type { DraftEdit } from '@/lib/syncStorage';
-import type { Character, CharacterData, ContentLists, GameSession, LoggedRoll, SteadingData, SteadingNPC, SteadingNpcForm } from '@/types';
+import type { Character, CharacterData, ContentLists, FollowerData, GameSession, LoggedRoll, SteadingData, SteadingNPC, SteadingNpcForm } from '@/types';
 
 export { parseCharacterData, parseCharacters, parseContent, parseSteading } from '@/lib/gameParsing';
 
@@ -23,6 +23,7 @@ export interface UseGameResult {
   updateSteading: (patch: Partial<SteadingData>, base?: Partial<SteadingData>) => Promise<void>;
   setCrewNpcLink: (characterId: string, slot: number, npcId: string | null) => Promise<void>;
   createCrewNpc: (characterId: string, slot: number, npc: SteadingNPC) => Promise<void>;
+  createFollowerNpc: (characterId: string, follower: FollowerData, npc: SteadingNPC) => Promise<void>;
   updateCrewNpc: (npcId: string, before: SteadingNpcForm, after: SteadingNpcForm) => Promise<void>;
   addCharacter: (character: Character) => Promise<void>;
   removeCharacter: (characterId: string) => Promise<void>;
@@ -153,11 +154,27 @@ export const useGame = (gameId: string): UseGameResult => {
     ], 'Add Marshal crew member to Steading');
   }, [game, raw, store]);
 
+  const createFollowerNpc = useCallback(async (characterId: string, follower: FollowerData, npc: SteadingNPC): Promise<void> => {
+    const character = game?.characters.find((c) => c.id === characterId);
+    const current = character?.data?.playbookFeatures?.followers?.find((f) => f.id === follower.id);
+    if (!raw || !character || !current) throw new Error('This follower no longer exists.');
+    if (current.npcId) throw new Error('Unlink the current NPC before creating another.');
+    if (!npc.id || !npc.name.trim()) throw new Error('Give this NPC a name.');
+    if ([...(game?.steading?.residents ?? []), ...(game?.steading?.neighbors ?? [])].some((n) => n.id === npc.id)) {
+      throw new Error('This NPC already exists.');
+    }
+    // Creation and association share a durable batch, so neither can save alone.
+    await store.enqueue(raw, [
+      { path: ['steading', 'residents', { id: npc.id }], before: undefined, after: stripUndefined({ ...npc, name: npc.name.trim() }) },
+      { path: ['characters', { id: characterId }, 'data', 'playbookFeatures', 'followers', { id: follower.id }, 'npcId'], before: undefined, after: npc.id },
+    ], 'Create follower NPC');
+  }, [game, raw, store]);
+
   const updateCrewNpc = useCallback((npcId: string, before: SteadingNpcForm, after: SteadingNpcForm) => {
     const section = game?.steading?.residents?.some((npc) => npc.id === npcId) ? 'residents'
       : game?.steading?.neighbors?.some((npc) => npc.id === npcId) ? 'neighbors' : null;
     if (!section) return Promise.reject(new Error('This Steading NPC no longer exists.'));
-    return edit(['steading', section, { id: npcId }], before, after, 'Crew NPC details');
+    return edit(['steading', section, { id: npcId }], before, after, 'NPC details');
   }, [game, edit]);
 
   const logRoll = useCallback((roll: LoggedRoll) => {
@@ -188,6 +205,6 @@ export const useGame = (gameId: string): UseGameResult => {
   }, [edit, store]);
 
   return { game, loading, error, updateGameName, updateCharacterName, updateCharacterData, adjustCharacterStats,
-    updateContent, updateField, updateSteading, setCrewNpcLink, createCrewNpc, updateCrewNpc, addCharacter, removeCharacter, reorderCharacters, logRoll,
+    updateContent, updateField, updateSteading, setCrewNpcLink, createCrewNpc, createFollowerNpc, updateCrewNpc, addCharacter, removeCharacter, reorderCharacters, logRoll,
     updateNotes, claimNotesLock: store.claimNotes, refreshNotesLock: store.refreshNotes, releaseNotesLock, replaceGameData };
 };

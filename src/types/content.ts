@@ -426,6 +426,7 @@ export interface FollowerGearItem {
 
 export interface FollowerData {
   id: string;
+  npcId?: string;
   name?: string;
   tags?: string;
   hp?: string;
