@@ -3,7 +3,7 @@ import { waitFor } from '@testing-library/react';
 import { firestoreMockModule, firestoreStore } from '@/test/firestoreMock';
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
 vi.mock('firebase/firestore', () => firestoreMockModule());
-import { GameSync } from '../gameSync';
+import { conflictReview, GameSync } from '../gameSync';
 import { changeQueue } from '../syncStorage';
 import { diffValues } from '../syncChanges';
 import { runTransaction } from 'firebase/firestore';
@@ -30,6 +30,57 @@ const send = async (store: GameSync) => {
 };
 
 describe('durable synchronization', () => {
+  const backlog = async () => {
+    const store = await client();
+    await store.enqueue(base, diffValues('Original', 'Draft 0', ['notes', 'gm']), 'Notes', { notesKey: 'gm', leaseToken: 'obsolete' });
+    await send(store);
+    const first = (await changeQueue(id)).conflict!;
+    await changeQueue(id, (queue) => ({ ...queue, pending: Array.from({ length: 200 }, (_, i) => ({
+      ...first, id: 'old-keystroke-' + i, leaseToken: 'old-hold-' + i,
+      changes: diffValues('Draft ' + i, 'Draft ' + (i + 1), ['notes', 'gm']),
+    })) }));
+    store.stop();
+    return client();
+  };
+  it('reviews and applies hundreds of old notes saves as the latest draft once', async () => {
+    const store = await backlog();
+    const review = conflictReview(store.getSnapshot().queue);
+    expect(review.conflict?.changes[0].after).toBe('Draft 200');
+    expect(review.pending).toHaveLength(0);
+    // Previewing must leave the complete recovery download intact.
+    expect(store.getRecovery().pending).toHaveLength(200);
+    await store.resolveConflict(true, store.getRemote(), review.conflict);
+    await store.send();
+    expect(firestoreStore.get('games/' + id)?.notes).toEqual({ gm: 'Draft 200' });
+    expect((await changeQueue(id)).conflict).toBeUndefined();
+    expect((await changeQueue(id)).pending).toHaveLength(0);
+  });
+  it('keeps the shared version without replaying intermediate notes saves', async () => {
+    const store = await backlog();
+    await store.resolveConflict(false);
+    await store.send();
+    expect(firestoreStore.get('games/' + id)?.notes).toEqual({ gm: 'Original' });
+    expect((await changeQueue(id)).pending).toHaveLength(0);
+  });
+  it('preserves unrelated edits and stops combining at another writer’s notes', async () => {
+    const store = await backlog();
+    const queue = store.getSnapshot().queue;
+    const unrelated = { ...queue.pending[0], id: 'name', notesKey: undefined, changes: diffValues('Game', 'Renamed', ['name']) };
+    const other = { ...queue.pending[50], id: 'other-writer', writer: 'another-screen' };
+    const input = { ...queue, pending: [unrelated, ...queue.pending.slice(0, 50), other, ...queue.pending.slice(50)] };
+    const review = conflictReview(input);
+    expect(review.conflict?.changes[0].after).toBe('Draft 50');
+    expect(review.pending).toEqual([unrelated, other, ...queue.pending.slice(50)]);
+  });
+  it('requires reviewing again if another tab adds notes after the preview', async () => {
+    const store = await backlog();
+    const review = conflictReview(store.getSnapshot().queue);
+    await changeQueue(id, (queue) => ({ ...queue, pending: [...queue.pending, {
+      ...queue.conflict!, id: 'newer', changes: diffValues('Draft 200', 'Newer draft', ['notes', 'gm']),
+    }] }));
+    await expect(store.resolveConflict(true, store.getRemote(), review.conflict)).rejects.toThrow('Your draft changed');
+    expect((await changeQueue(id)).pending).toHaveLength(201);
+  });
   it('finishes a queued release before resuming typing with a new hold', async () => {
     const store = await client();
     await store.claimNotes('gm');
