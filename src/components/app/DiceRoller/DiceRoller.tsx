@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Button, Heading, Icon, Input, Text } from '@/components/ui';
 import { rollNotation, type DiceRollOutcome } from '@/lib/diceNotation';
 import { generateId } from '@/lib/id';
+import { RollLog } from '@/components/character/RollLog/RollLog';
 import type { LoggedRoll } from '@/types';
 import styles from './DiceRoller.module.css';
 
@@ -13,6 +14,7 @@ interface DiceRollerProps {
   rollerId: string;
   rollerName: string;
   onRoll: (roll: LoggedRoll) => Promise<void>;
+  rolls?: LoggedRoll[];
 }
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
@@ -52,7 +54,7 @@ const withModifier = (notation: string, delta: number): string => {
 // A slide-out dice roller pinned to the bottom-right of every playbook page, its tab attached to the panel. Takes any dice notation (typed) or
 // builds one from the die buttons; each completed roll shows here and is appended to the shared roll log
 // on the game page.
-export const DiceRoller = ({ rollerId, rollerName, onRoll }: DiceRollerProps) => {
+export const DiceRoller = ({ rollerId, rollerName, onRoll, rolls = [] }: DiceRollerProps) => {
   const [open, setOpen] = useState(false);
   const notificationRef = useNotificationTarget(open, 1);
   const [notation, setNotation] = useState('');
@@ -219,6 +221,11 @@ export const DiceRoller = ({ rollerId, rollerName, onRoll }: DiceRollerProps) =>
             <Text size="sm" color="muted" className={styles.empty}>Your roll appears here.</Text>
           )}
         </div>
+
+        <section className={styles.history} aria-label="Party rolls" aria-live="polite">
+          <Heading as="h3" size="label">Party rolls</Heading>
+          <RollLog rolls={rolls} />
+        </section>
 
         {earlier.length > 0 && (
           <div className={styles.history}>

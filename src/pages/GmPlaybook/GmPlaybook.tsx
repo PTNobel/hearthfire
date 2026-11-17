@@ -129,7 +129,7 @@ const GmPlaybookContent = ({ g, id, updateContent, updateField, logRoll, notesAc
   const nav = buildGameNav(g, '/game/gm');
 
   return (
-    <PageLayout title="GM Playbook" gameId={id} nav={nav} diceRoller={{ rollerId: 'gm', rollerName: 'GM', onRoll: logRoll }}>
+    <PageLayout title="GM Playbook" gameId={id} nav={nav} diceRoller={{ rollerId: 'gm', rollerName: 'GM', onRoll: logRoll, rolls: g.diceRolls }}>
       <PageMeta
         title={`GM Playbook — ${gameName} — Hearthfire`}
         description={`GM playbook for ${gameName}. Core loop, moves, principles, and session tools.`}

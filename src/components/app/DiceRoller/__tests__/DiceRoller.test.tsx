@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DiceRoller } from '../DiceRoller';
+import type { LoggedRoll } from '@/types';
 
 const setup = () => {
   const onRoll = vi.fn().mockResolvedValue(undefined);
@@ -10,6 +11,29 @@ const setup = () => {
 };
 
 describe('DiceRoller', () => {
+  it('shows other players’ move and notation rolls as shared updates arrive', async () => {
+    const onRoll = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(<DiceRoller rollerId="c1" rollerName="Aerin" onRoll={onRoll} rolls={[]} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Dice' }));
+    const party = within(screen.getByRole('region', { name: 'Party rolls' }));
+    expect(party.getByText('No rolls yet.')).toBeInTheDocument();
+    const move: LoggedRoll = {
+      id: 'other-move', characterId: 'c2', characterName: 'Bran', moveName: 'Defy Danger',
+      stat: 'DEX', dice: [4, 5], mod: 1, total: 10, mode: 'normal', band: '10+', createdAt: 1,
+    };
+    const dice: LoggedRoll = {
+      ...move, id: 'gm-dice', characterId: 'gm', characterName: 'GM', moveName: '',
+      stat: 'nothing', dice: [], mod: 0, total: 12, band: null, notation: '2d8', breakdown: '5+7', createdAt: 2,
+    };
+    rerender(<DiceRoller rollerId="c1" rollerName="Aerin" onRoll={onRoll} rolls={[move, dice]} />);
+    expect(party.getByText('Bran')).toBeInTheDocument();
+    expect(party.getByText(/Defy Danger/)).toBeInTheDocument();
+    expect(party.getByText('10')).toBeInTheDocument();
+    expect(party.getByText('2d8')).toBeInTheDocument();
+    expect(party.getByText('12')).toBeInTheDocument();
+    expect(party.getAllByRole('listitem')[0]).toHaveTextContent('GM');
+    expect(onRoll).not.toHaveBeenCalled();
+  });
   it('exposes the open state on the tab', async () => {
     const { user } = setup();
     const tab = screen.getByRole('button', { name: 'Dice' });
